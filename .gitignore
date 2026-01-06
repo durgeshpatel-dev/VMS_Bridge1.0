@@ -1,0 +1,38 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Node
+node_modules/
+dist/
+build/
+
+# Logs and database files
+*.log
+*.sqlite3
+
+# Uploads and temporary files
+upload/
+tmp/
+*.tmp
+
+# PowerShell scripts (ignore all .ps1 files)
+*.ps1
+
+# Ignore specific markdown files considered unnecessary
+/AUTH_INTEGRATION_GUIDE.md
+/QUICK_REF_AUTH.md
+/README_AUTH.md
+/Backend/USERS_SCHEMA.md
+
+# Ignore editor/backup markdown files
+*.md~
+# Note: We intentionally do NOT ignore '*.md' generally so README and docs stay tracked

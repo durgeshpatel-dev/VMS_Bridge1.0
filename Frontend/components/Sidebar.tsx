@@ -1,5 +1,6 @@
 import React from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SidebarProps {
   onClose?: () => void;
@@ -7,7 +8,14 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   const navItems = [
     { name: 'Dashboard', icon: 'dashboard', path: '/' },
@@ -66,13 +74,26 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
         {/* User Profile */}
         <div className="flex flex-col gap-3">
           <div className="h-[1px] bg-border w-full"></div>
+          
+          {/* User Info */}
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="size-8 rounded-full bg-gradient-to-tr from-primary to-blue-400"></div>
-            <div>
-              <p className="text-white text-sm font-medium">Admin User</p>
-              <p className="text-secondary text-xs">admin@vmsbridge.io</p>
+            <div className="size-8 rounded-full bg-gradient-to-tr from-primary to-blue-400 flex items-center justify-center text-white text-sm font-bold">
+              {user?.full_name?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-sm font-medium truncate">{user?.full_name || 'User'}</p>
+              <p className="text-secondary text-xs truncate">{user?.email || ''}</p>
             </div>
           </div>
+          
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors group"
+          >
+            <span className="material-symbols-outlined text-[24px]">logout</span>
+            <p className="text-sm font-medium leading-normal">Logout</p>
+          </button>
         </div>
       </div>
     </div>

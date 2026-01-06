@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 const Signup: React.FC = () => {
   const navigate = useNavigate();
+  const { signup, isLoading } = useAuth();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -10,6 +13,7 @@ const Signup: React.FC = () => {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const previousBodyOverflow = document.body.style.overflow;
@@ -33,11 +37,38 @@ const Signup: React.FC = () => {
   const passwordStrength = getPasswordStrength(password);
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
 
-  const handleSignup = (e: React.FormEvent) => {
+  const { success, error: toastError } = useToast();
+
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordsMatch && agreedToTerms) {
-      localStorage.setItem('isAuthenticated', 'true');
+    setError('');
+    
+    if (!passwordsMatch) {
+      setError('Passwords do not match');
+      toastError('Passwords do not match');
+      return;
+    }
+    
+    if (!agreedToTerms) {
+      setError('Please agree to the terms and conditions');
+      toastError('Please agree to the terms and conditions');
+      return;
+    }
+    
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      toastError('Password must be at least 8 characters long');
+      return;
+    }
+    
+    try {
+      await signup(email, password, fullName);
+      success('Account created successfully');
       navigate('/');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Signup failed';
+      setError(msg);
+      toastError(msg);
     }
   };
 
@@ -64,6 +95,12 @@ const Signup: React.FC = () => {
         </div>
 
         <div className="bg-surface rounded-xl border border-border shadow-2xl p-4 sm:p-5 md:p-6 w-full backdrop-blur-sm">
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+          
           <form className="flex flex-col gap-3" onSubmit={handleSignup}>
             {/* Full Name */}
             <div className="flex flex-col gap-1.5">
@@ -197,10 +234,10 @@ const Signup: React.FC = () => {
 
             <button 
               type="submit"
-              disabled={!passwordsMatch || !agreedToTerms}
+              disabled={!passwordsMatch || !agreedToTerms || isLoading}
               className="mt-1 w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm sm:text-base font-bold text-white shadow-sm hover:bg-blue-600 transition-all active:scale-[0.98] group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
             >
-              Create Account
+              {isLoading ? 'Creating Account...' : 'Create Account'}
               <span className="material-symbols-outlined text-[20px] transition-transform group-hover:translate-x-1">arrow_forward</span>
             </button>
           </form>
@@ -208,7 +245,7 @@ const Signup: React.FC = () => {
           <div className="mt-4 text-center">
             <p className="text-xs sm:text-sm text-secondary">
               Already have an account? 
-              <a className="font-semibold text-primary hover:text-blue-400 hover:underline ml-1 cursor-pointer" onClick={() => navigate('/login')}>Sign in</a>
+              <Link to="/login" className="font-semibold text-primary hover:text-blue-400 hover:underline ml-1 cursor-pointer">Sign in</Link>
             </p>
           </div>
         </div>

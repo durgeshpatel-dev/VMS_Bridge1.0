@@ -1,14 +1,30 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const { success, error: toastError } = useToast();
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('isAuthenticated', 'true');
-    navigate('/');
+    setError('');
+    
+    try {
+      await login(email, password);
+      success('Signed in successfully');
+      navigate('/');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Login failed';
+      setError(msg);
+      toastError(msg);
+    }
   };
 
   return (
@@ -34,6 +50,12 @@ const Login: React.FC = () => {
             </div>
 
             <div className="bg-surface rounded-xl border border-border shadow-2xl p-5 sm:p-6 md:p-8 w-full backdrop-blur-sm">
+                {error && (
+                    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                        {error}
+                    </div>
+                )}
+                
                 <form className="flex flex-col gap-4 sm:gap-5" onSubmit={handleLogin}>
                     <div className="flex flex-col gap-2">
                         <label className="text-white text-sm font-medium leading-normal">Email</label>
@@ -56,7 +78,9 @@ const Login: React.FC = () => {
                               className="flex-1 bg-transparent border-none text-white h-12 px-4 placeholder:text-secondary focus:ring-0 text-base" 
                               placeholder="••••••••" 
                               type="password"
-                              defaultValue="password123"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              required
                             />
                             <div className="pr-4 flex items-center justify-center text-secondary cursor-pointer hover:text-primary transition-colors">
                                 <span className="material-symbols-outlined">visibility_off</span>
@@ -67,8 +91,12 @@ const Login: React.FC = () => {
                         </div>
                     </div>
 
-                    <button className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-base font-bold text-white shadow-sm hover:bg-blue-600 transition-all active:scale-[0.98] group">
-                        Sign In
+                    <button 
+                        type="submit"
+                        disabled={isLoading}
+                        className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-base font-bold text-white shadow-sm hover:bg-blue-600 transition-all active:scale-[0.98] group disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? 'Signing In...' : 'Sign In'}
                         <span className="material-symbols-outlined text-[20px] transition-transform group-hover:translate-x-1">arrow_forward</span>
                     </button>
                 </form>
@@ -76,7 +104,7 @@ const Login: React.FC = () => {
                 <div className="mt-6 text-center">
                     <p className="text-sm text-secondary">
                         Don't have an account? 
-                        <a className="font-semibold text-primary hover:text-blue-400 hover:underline ml-1" href="#">Sign up</a>
+                        <Link to="/signup" className="font-semibold text-primary hover:text-blue-400 hover:underline ml-1">Sign up</Link>
                     </p>
                 </div>
             </div>
