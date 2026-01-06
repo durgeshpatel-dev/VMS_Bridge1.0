@@ -1,7 +1,11 @@
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
 
@@ -15,7 +19,16 @@ const Sidebar: React.FC = () => {
   ];
 
   return (
-    <div className="flex w-64 flex-col bg-[#111418] border-r border-border flex-shrink-0 z-20 h-full">
+    <div className="flex w-64 flex-col bg-[#111418] border-r border-border flex-shrink-0 z-20 h-full lg:h-screen">
+      {/* Mobile close button */}
+      <div className="lg:hidden flex justify-end p-4">
+        <button
+          onClick={onClose}
+          className="p-2 rounded-lg hover:bg-border transition-colors"
+        >
+          <span className="material-symbols-outlined text-white">close</span>
+        </button>
+      </div>
       <div className="flex h-full flex-col justify-between p-4">
         <div className="flex flex-col gap-4">
           {/* Logo */}
