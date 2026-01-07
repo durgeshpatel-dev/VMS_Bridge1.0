@@ -27,6 +27,28 @@ class TokenRefreshRequest(BaseModel):
     refresh_token: str
 
 
+class UserProfileUpdateRequest(BaseModel):
+    """User profile update request."""
+    full_name: str | None = Field(None, min_length=1, max_length=255)
+    email: EmailStr | None = None
+
+
+class UserPasswordUpdateRequest(BaseModel):
+    """User password update request."""
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+
+class JiraCredentialsUpdateRequest(BaseModel):
+    """Jira API credentials update request."""
+    jira_api_token: str = Field(..., min_length=1)
+
+
+class JiraProjectKeysUpdateRequest(BaseModel):
+    """Jira project keys update request."""
+    project_keys: List[str] = Field(..., min_items=1)
+
+
 # Response schemas
 class UserResponse(BaseModel):
     """User response data."""

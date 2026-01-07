@@ -244,3 +244,93 @@ class UserService:
             await session.refresh(user)
         
         return user
+    
+    @staticmethod
+    async def update_profile(
+        session: AsyncSession,
+        user_id: UUID,
+        full_name: str | None = None,
+        email: str | None = None
+    ) -> User | None:
+        """
+        Update user's profile information.
+        
+        Args:
+            session: Database session
+            user_id: User ID
+            full_name: New full name (optional)
+            email: New email (optional)
+        
+        Returns:
+            Updated user object
+        """
+        user = await UserService.get_user_by_id(session, user_id)
+        
+        if user:
+            if full_name is not None:
+                user.full_name = full_name
+            
+            if email is not None:
+                # Check if email is already taken by another user
+                existing = await UserService.get_user_by_email(session, email)
+                if existing and existing.id != user_id:
+                    return None  # Email already in use
+                user.email = email
+            
+            await session.commit()
+            await session.refresh(user)
+        
+        return user
+    
+    @staticmethod
+    async def update_password(
+        session: AsyncSession,
+        user_id: UUID,
+        new_password_hash: str
+    ) -> User | None:
+        """
+        Update user's password.
+        
+        Args:
+            session: Database session
+            user_id: User ID
+            new_password_hash: New hashed password
+        
+        Returns:
+            Updated user object
+        """
+        user = await UserService.get_user_by_id(session, user_id)
+        
+        if user:
+            user.password_hash = new_password_hash
+            await session.commit()
+            await session.refresh(user)
+        
+        return user
+    
+    @staticmethod
+    async def set_jira_project_keys(
+        session: AsyncSession,
+        user_id: UUID,
+        project_keys: list[str]
+    ) -> User | None:
+        """
+        Replace all Jira project keys with a new list.
+        
+        Args:
+            session: Database session
+            user_id: User ID
+            project_keys: List of project keys
+        
+        Returns:
+            Updated user object
+        """
+        user = await UserService.get_user_by_id(session, user_id)
+        
+        if user:
+            user.jira_project_keys = project_keys
+            await session.commit()
+            await session.refresh(user)
+        
+        return user
+

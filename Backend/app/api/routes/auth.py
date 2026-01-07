@@ -11,10 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas import (
     AuthResponse,
+    JiraCredentialsUpdateRequest,
+    JiraProjectKeysUpdateRequest,
     MessageResponse,
     TokenRefreshRequest,
     TokenResponse,
     UserLoginRequest,
+    UserPasswordUpdateRequest,
+    UserProfileUpdateRequest,
     UserResponse,
     UserSignupRequest,
 )
@@ -24,6 +28,8 @@ from app.core.security import (
     create_refresh_token,
     decode_token,
     get_token_expiration,
+    hash_password,
+    verify_password,
 )
 from app.db.session import get_db
 from app.db.user_service import UserService
@@ -116,13 +122,18 @@ async def signup(
     
     # Store JWT session in database
     token_expiration = get_token_expiration(access_token)
-    if token_expiration:
-        await UserService.update_jwt_session(
-            session=session,
-            user_id=user.id,
-            jwt_token=access_token,
-            expires_at=token_expiration
+    if not token_expiration:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to extract token expiration"
         )
+    
+    await UserService.update_jwt_session(
+        session=session,
+        user_id=user.id,
+        jwt_token=access_token,
+        expires_at=token_expiration
+    )
     
     return AuthResponse(
         user=UserResponse.model_validate(user),
@@ -160,13 +171,18 @@ async def login(
     
     # Store JWT session in database
     token_expiration = get_token_expiration(access_token)
-    if token_expiration:
-        await UserService.update_jwt_session(
-            session=session,
-            user_id=user.id,
-            jwt_token=access_token,
-            expires_at=token_expiration
+    if not token_expiration:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to extract token expiration"
         )
+    
+    await UserService.update_jwt_session(
+        session=session,
+        user_id=user.id,
+        jwt_token=access_token,
+        expires_at=token_expiration
+    )
     
     return AuthResponse(
         user=UserResponse.model_validate(user),
@@ -235,13 +251,18 @@ async def refresh_token(
     
     # Update JWT session
     token_expiration = get_token_expiration(new_access_token)
-    if token_expiration:
-        await UserService.update_jwt_session(
-            session=session,
-            user_id=user.id,
-            jwt_token=new_access_token,
-            expires_at=token_expiration
+    if not token_expiration:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to extract token expiration"
         )
+    
+    await UserService.update_jwt_session(
+        session=session,
+        user_id=user.id,
+        jwt_token=new_access_token,
+        expires_at=token_expiration
+    )
     
     return TokenResponse(
         access_token=new_access_token,
@@ -258,3 +279,166 @@ async def get_current_user_info(
     Get current authenticated user information.
     """
     return current_user
+
+
+@router.put("/me/profile", response_model=UserResponse)
+async def update_user_profile(
+    profile_data: UserProfileUpdateRequest,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Update current user's profile (name, email).
+    """
+    user = await UserService.update_profile(
+        session=session,
+        user_id=current_user.id,
+        full_name=profile_data.full_name,
+        email=profile_data.email
+    )
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already in use by another account"
+        )
+    
+    return UserResponse.model_validate(user)
+
+
+@router.put("/me/password", response_model=MessageResponse)
+async def update_user_password(
+    password_data: UserPasswordUpdateRequest,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Update current user's password.
+    """
+    # Get full user object to verify current password
+    user = await UserService.get_user_by_id(session, current_user.id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Verify current password
+    if not verify_password(password_data.current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Update to new password
+    new_hash = hash_password(password_data.new_password)
+    updated_user = await UserService.update_password(
+        session=session,
+        user_id=current_user.id,
+        new_password_hash=new_hash
+    )
+    
+    if not updated_user:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update password"
+        )
+    
+    return MessageResponse(message="Password updated successfully")
+
+
+@router.put("/me/jira/credentials", response_model=UserResponse)
+async def update_jira_credentials(
+    jira_data: JiraCredentialsUpdateRequest,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Update current user's Jira API token.
+    Note: In production, encrypt the token before storing.
+    """
+    user = await UserService.update_jira_credentials(
+        session=session,
+        user_id=current_user.id,
+        jira_api_token=jira_data.jira_api_token  # TODO: Encrypt in production
+    )
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    return UserResponse.model_validate(user)
+
+
+@router.put("/me/jira/projects", response_model=UserResponse)
+async def update_jira_projects(
+    project_data: JiraProjectKeysUpdateRequest,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Update current user's Jira project keys (replaces all existing keys).
+    """
+    user = await UserService.set_jira_project_keys(
+        session=session,
+        user_id=current_user.id,
+        project_keys=project_data.project_keys
+    )
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    return UserResponse.model_validate(user)
+
+
+@router.post("/me/jira/projects/{project_key}", response_model=UserResponse)
+async def add_jira_project(
+    project_key: str,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Add a single Jira project key to current user's list.
+    """
+    user = await UserService.add_jira_project_key(
+        session=session,
+        user_id=current_user.id,
+        project_key=project_key
+    )
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    return UserResponse.model_validate(user)
+
+
+@router.delete("/me/jira/projects/{project_key}", response_model=UserResponse)
+async def remove_jira_project(
+    project_key: str,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Remove a single Jira project key from current user's list.
+    """
+    user = await UserService.remove_jira_project_key(
+        session=session,
+        user_id=current_user.id,
+        project_key=project_key
+    )
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    return UserResponse.model_validate(user)

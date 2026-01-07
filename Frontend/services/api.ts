@@ -185,6 +185,60 @@ class ApiClient {
       return null;
     }
   }
+
+  // User profile endpoints
+  async updateProfile(data: { full_name?: string; email?: string }): Promise<User> {
+    const response = await this.request<User>('/auth/me/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    localStorage.setItem('user', JSON.stringify(response));
+    return response;
+  }
+
+  async updatePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    return this.request('/auth/me/password', {
+      method: 'PUT',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
+  }
+
+  async updateJiraCredentials(jiraApiToken: string): Promise<User> {
+    const response = await this.request<User>('/auth/me/jira/credentials', {
+      method: 'PUT',
+      body: JSON.stringify({ jira_api_token: jiraApiToken }),
+    });
+    localStorage.setItem('user', JSON.stringify(response));
+    return response;
+  }
+
+  async updateJiraProjects(projectKeys: string[]): Promise<User> {
+    const response = await this.request<User>('/auth/me/jira/projects', {
+      method: 'PUT',
+      body: JSON.stringify({ project_keys: projectKeys }),
+    });
+    localStorage.setItem('user', JSON.stringify(response));
+    return response;
+  }
+
+  async addJiraProject(projectKey: string): Promise<User> {
+    const response = await this.request<User>(`/auth/me/jira/projects/${projectKey}`, {
+      method: 'POST',
+    });
+    localStorage.setItem('user', JSON.stringify(response));
+    return response;
+  }
+
+  async removeJiraProject(projectKey: string): Promise<User> {
+    const response = await this.request<User>(`/auth/me/jira/projects/${projectKey}`, {
+      method: 'DELETE',
+    });
+    localStorage.setItem('user', JSON.stringify(response));
+    return response;
+  }
 }
 
 export const apiClient = new ApiClient();

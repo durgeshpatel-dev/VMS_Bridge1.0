@@ -1,6 +1,144 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { apiClient } from '../services/api';
 
 const Settings: React.FC = () => {
+  const { user, refreshUser } = useAuth();
+  const { success, error: toastError } = useToast();
+  
+  // Profile state
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  
+  // Password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  
+  // Jira state
+  const [jiraApiToken, setJiraApiToken] = useState('');
+  const [showJiraToken, setShowJiraToken] = useState(false);
+  const [isJiraLoading, setIsJiraLoading] = useState(false);
+  const [newProjectKey, setNewProjectKey] = useState('');
+  const [isAddingProject, setIsAddingProject] = useState(false);
+
+  // Initialize form with user data
+  useEffect(() => {
+    if (user) {
+      setFullName(user.full_name);
+      setEmail(user.email);
+    }
+  }, [user]);
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsProfileLoading(true);
+    
+    try {
+      await apiClient.updateProfile({ full_name: fullName, email });
+      await refreshUser();
+      success('Profile updated successfully');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Failed to update profile');
+    } finally {
+      setIsProfileLoading(false);
+    }
+  };
+
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (newPassword !== confirmPassword) {
+      toastError('New passwords do not match');
+      return;
+    }
+    
+    if (newPassword.length < 8) {
+      toastError('Password must be at least 8 characters');
+      return;
+    }
+    
+    setIsPasswordLoading(true);
+    
+    try {
+      await apiClient.updatePassword(currentPassword, newPassword);
+      success('Password updated successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Failed to update password');
+    } finally {
+      setIsPasswordLoading(false);
+    }
+  };
+
+  const handleJiraUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!jiraApiToken.trim()) {
+      toastError('Jira API token is required');
+      return;
+    }
+    
+    setIsJiraLoading(true);
+    
+    try {
+      await apiClient.updateJiraCredentials(jiraApiToken);
+      await refreshUser();
+      success('Jira credentials updated successfully');
+      setJiraApiToken('');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Failed to update Jira credentials');
+    } finally {
+      setIsJiraLoading(false);
+    }
+  };
+
+  const handleAddProjectKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newProjectKey.trim()) {
+      toastError('Project key is required');
+      return;
+    }
+    
+    // Validate project key format (uppercase alphanumeric)
+    const keyRegex = /^[A-Z][A-Z0-9]{1,9}$/;
+    if (!keyRegex.test(newProjectKey.toUpperCase())) {
+      toastError('Invalid project key format (e.g., PROJ, DEV)');
+      return;
+    }
+    
+    setIsAddingProject(true);
+    
+    try {
+      await apiClient.addJiraProject(newProjectKey.toUpperCase());
+      await refreshUser();
+      success(`Project ${newProjectKey.toUpperCase()} added successfully`);
+      setNewProjectKey('');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Failed to add project key');
+    } finally {
+      setIsAddingProject(false);
+    }
+  };
+
+  const handleRemoveProjectKey = async (projectKey: string) => {
+    try {
+      await apiClient.removeJiraProject(projectKey);
+      await refreshUser();
+      success(`Project ${projectKey} removed successfully`);
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Failed to remove project key');
+    }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
       <header className="flex-shrink-0 px-8 py-6 border-b border-border bg-background/95 backdrop-blur-sm z-10">
@@ -19,44 +157,132 @@ const Settings: React.FC = () => {
                 <p className="text-secondary text-sm">Update your public profile and contact details.</p>
               </div>
             </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleProfileUpdate} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="col-span-1 md:col-span-2 flex items-center gap-4 mb-2">
-                <div className="size-16 rounded-full bg-cover bg-center border-2 border-border shadow-md bg-gradient-to-tr from-primary to-blue-400"></div>
-                <div>
-                  <button className="px-4 py-2 bg-[#283039] border border-border rounded-lg text-sm font-medium text-white hover:bg-[#323b46] transition-colors">
-                    Change Avatar
-                  </button>
+                <div className="size-16 rounded-full bg-cover bg-center border-2 border-border shadow-md bg-gradient-to-tr from-primary to-blue-400 flex items-center justify-center text-white text-2xl font-bold">
+                  {user?.full_name?.charAt(0).toUpperCase() || 'U'}
                 </div>
               </div>
               
               <label className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-white">Full Name</span>
-                <input className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 text-sm" type="text" defaultValue="Admin User" />
-              </label>
-              
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-white">Job Title</span>
-                <input className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 text-sm" type="text" defaultValue="Senior Security Engineer" />
+                <input 
+                  className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 text-sm" 
+                  type="text" 
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                />
               </label>
               
               <label className="flex flex-col gap-2 col-span-1 md:col-span-2">
                 <span className="text-sm font-medium text-white">Email Address</span>
                 <div className="relative">
-                  <input className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 pr-10 text-sm" type="email" defaultValue="admin@vmsbridge.io" />
-                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-[20px]">check_circle</span>
+                  <input 
+                    className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 pr-10 text-sm" 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                  {user?.is_active && (
+                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-[20px]">check_circle</span>
+                  )}
                 </div>
                 <p className="text-xs text-secondary">Your email is verified.</p>
               </label>
               
               <div className="col-span-1 md:col-span-2 flex justify-end pt-2">
-                <button className="px-5 py-2.5 bg-primary hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-900/20">
-                  Save Changes
+                <button 
+                  type="submit"
+                  disabled={isProfileLoading}
+                  className="px-5 py-2.5 bg-primary hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-900/20 disabled:opacity-50"
+                >
+                  {isProfileLoading ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
-            </div>
+            </form>
           </section>
 
-          {/* Integrations */}
+          {/* Password Section */}
+          <section className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-border bg-[#1c2127]">
+              <h2 className="text-lg font-semibold text-white">Change Password</h2>
+              <p className="text-secondary text-sm">Update your password to keep your account secure.</p>
+            </div>
+            <form onSubmit={handlePasswordUpdate} className="p-6 grid grid-cols-1 gap-6">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-white">Current Password</span>
+                <div className="relative">
+                  <input 
+                    className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 pr-10 text-sm" 
+                    type={showCurrentPassword ? "text" : "password"}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    required
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">
+                      {showCurrentPassword ? 'visibility' : 'visibility_off'}
+                    </span>
+                  </button>
+                </div>
+              </label>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-white">New Password</span>
+                  <div className="relative">
+                    <input 
+                      className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 pr-10 text-sm" 
+                      type={showNewPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      minLength={8}
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">
+                        {showNewPassword ? 'visibility' : 'visibility_off'}
+                      </span>
+                    </button>
+                  </div>
+                </label>
+                
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-white">Confirm New Password</span>
+                  <input 
+                    className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 text-sm" 
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={8}
+                  />
+                </label>
+              </div>
+              
+              <div className="flex justify-end pt-2">
+                <button 
+                  type="submit"
+                  disabled={isPasswordLoading}
+                  className="px-5 py-2.5 bg-primary hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-900/20 disabled:opacity-50"
+                >
+                  {isPasswordLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          {/* Jira Integration */}
           <section className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="p-6 border-b border-border flex justify-between items-center bg-[#1c2127]">
               <div className="flex items-center gap-3">
@@ -66,72 +292,109 @@ const Settings: React.FC = () => {
                   <p className="text-secondary text-sm">Connect your issue tracker for automated ticket creation.</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 px-2 py-1 bg-green-500/10 border border-green-500/20 rounded-md">
-                <div className="size-2 rounded-full bg-green-500"></div>
-                <span className="text-xs font-medium text-green-500">Connected</span>
-              </div>
+              {user?.jira_project_keys && user.jira_project_keys.length > 0 && (
+                <div className="flex items-center gap-2 px-2 py-1 bg-green-500/10 border border-green-500/20 rounded-md">
+                  <div className="size-2 rounded-full bg-green-500"></div>
+                  <span className="text-xs font-medium text-green-500">Connected</span>
+                </div>
+              )}
             </div>
-            <div className="p-6 grid grid-cols-1 gap-6">
+            <form onSubmit={handleJiraUpdate} className="p-6 grid grid-cols-1 gap-6">
               <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-white">Jira URL</span>
-                <input className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 text-sm" type="url" defaultValue="https://vmsbridge.atlassian.net" />
+                <span className="text-sm font-medium text-white">Jira API Token</span>
+                <div className="relative">
+                  <input 
+                    className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 pr-10 text-sm" 
+                    type={showJiraToken ? "text" : "password"}
+                    value={jiraApiToken}
+                    onChange={(e) => setJiraApiToken(e.target.value)}
+                    placeholder="Enter your Jira API token"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowJiraToken(!showJiraToken)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">
+                      {showJiraToken ? 'visibility' : 'visibility_off'}
+                    </span>
+                  </button>
+                </div>
+                <p className="text-xs text-secondary">
+                  Generate a token from your Jira account settings
+                </p>
               </label>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-white">Username / Email</span>
-                  <input className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 text-sm" type="text" defaultValue="bot@vmsbridge.io" />
-                </label>
-                <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-white">API Token</span>
-                  <div className="relative group/input">
-                    <input className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 pr-10 text-sm" type="password" defaultValue="fake-token-value" />
-                    <button className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors">
-                      <span className="material-symbols-outlined text-[20px]">visibility_off</span>
-                    </button>
-                  </div>
-                </label>
+              <div className="flex justify-end">
+                <button 
+                  type="submit"
+                  disabled={isJiraLoading}
+                  className="px-5 py-2.5 bg-primary hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-900/20 disabled:opacity-50"
+                >
+                  {isJiraLoading ? 'Updating...' : 'Update Jira Credentials'}
+                </button>
               </div>
-            </div>
+            </form>
           </section>
 
-          {/* API Keys */}
+          {/* Jira Project Keys Management */}
           <section className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-border flex justify-between items-center bg-[#1c2127]">
-              <div>
-                <h2 className="text-lg font-semibold text-white">API Keys</h2>
-                <p className="text-secondary text-sm">Manage API access tokens for external scripts.</p>
-              </div>
-              <button className="px-3 py-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px]">add</span>
-                Generate New Key
-              </button>
+            <div className="p-6 border-b border-border bg-[#1c2127]">
+              <h2 className="text-lg font-semibold text-white">Jira Project Keys</h2>
+              <p className="text-secondary text-sm">Manage project keys for vulnerability ticket creation.</p>
             </div>
-            <div className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-border bg-[#1c2127]/50 text-xs uppercase text-secondary">
-                      <th className="px-6 py-4 font-medium">Key Name</th>
-                      <th className="px-6 py-4 font-medium">Token Hint</th>
-                      <th className="px-6 py-4 font-medium">Created</th>
-                      <th className="px-6 py-4 font-medium text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm">
-                    <tr className="border-b border-border hover:bg-[#1c2127]/30 transition-colors group">
-                      <td className="px-6 py-4 font-medium text-white">CI/CD Pipeline</td>
-                      <td className="px-6 py-4 font-mono text-secondary">sk_live_...93kd</td>
-                      <td className="px-6 py-4 text-secondary">Oct 24, 2023</td>
-                      <td className="px-6 py-4 text-right">
-                        <button className="text-slate-400 hover:text-danger transition-colors p-1 rounded-md hover:bg-red-500/10" title="Revoke Key">
-                          <span className="material-symbols-outlined text-[20px]">delete</span>
+            <div className="p-6">
+              {/* Add Project Key Form */}
+              <form onSubmit={handleAddProjectKey} className="flex gap-3 mb-6">
+                <div className="flex-1">
+                  <input 
+                    className="w-full rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 text-sm uppercase" 
+                    type="text"
+                    value={newProjectKey}
+                    onChange={(e) => setNewProjectKey(e.target.value)}
+                    placeholder="Enter project key (e.g., PROJ, DEV)"
+                    maxLength={10}
+                  />
+                </div>
+                <button 
+                  type="submit"
+                  disabled={isAddingProject}
+                  className="px-5 py-2.5 bg-primary hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-900/20 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add</span>
+                  {isAddingProject ? 'Adding...' : 'Add Project'}
+                </button>
+              </form>
+              
+              {/* Project Keys List */}
+              {user?.jira_project_keys && user.jira_project_keys.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-white mb-1">Connected Projects ({user.jira_project_keys.length})</span>
+                  <div className="flex flex-wrap gap-2">
+                    {user.jira_project_keys.map((key) => (
+                      <div 
+                        key={key} 
+                        className="group flex items-center gap-2 px-3 py-2 bg-[#1c2127] border border-border rounded-lg text-sm text-white hover:border-primary/50 transition-colors"
+                      >
+                        <span className="font-mono font-medium">{key}</span>
+                        <button
+                          onClick={() => handleRemoveProjectKey(key)}
+                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all"
+                          title="Remove project"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">close</span>
                         </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 px-4 bg-[#1c2127] rounded-lg border border-border border-dashed">
+                  <span className="material-symbols-outlined text-4xl text-secondary mb-2">folder_open</span>
+                  <p className="text-secondary text-sm">No project keys configured yet.</p>
+                  <p className="text-secondary text-xs mt-1">Add project keys above to enable Jira integration.</p>
+                </div>
+              )}
             </div>
           </section>
 
