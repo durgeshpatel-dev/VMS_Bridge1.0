@@ -1,14 +1,166 @@
-import React from 'react';
-import { UploadedScan } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { apiClient, Scan } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 
-const recentUploads: UploadedScan[] = [
-  { id: '1', filename: 'Scan_Production_Cluster_A.xml', team: 'SEC', size: '142 MB', date: 'Oct 24, 2023 10:42 AM', status: 'RUNNING' },
-  { id: '2', filename: 'Q3_Audit_IT_Infra.xml', team: 'IT', size: '84 MB', date: 'Oct 23, 2023 04:15 PM', status: 'PROCESSED' },
-  { id: '3', filename: 'Prod_Payment_Gateway_v2.xml', team: 'PROD', size: '210 MB', date: 'Oct 22, 2023 09:00 AM', status: 'PROCESSED' },
-  { id: '4', filename: 'Legacy_Systems_Check.xml', team: 'IT', size: '5 MB', date: 'Oct 20, 2023 11:30 AM', status: 'FAILED' },
-];
+const ALLOWED_EXTENSIONS = ['.json', '.xml', '.csv', '.txt', '.sarif', '.cyclonedx'];
+const MAX_FILE_SIZE_MB = 100;
 
 const ScanUpload: React.FC = () => {
+  const [scans, setScans] = useState<Scan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { success, error } = useToast();
+
+  useEffect(() => {
+    loadScans();
+  }, []);
+
+  const loadScans = async () => {
+    try {
+      setLoading(true);
+      const data = await apiClient.listScans();
+      setScans(data);
+    } catch (error) {
+      error('Failed to load scans');
+      console.error('Error loading scans:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateFile = (file: File): string | null => {
+    const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+    
+    if (!ALLOWED_EXTENSIONS.includes(fileExt)) {
+      return `Invalid file type. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`;
+    }
+    
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > MAX_FILE_SIZE_MB) {
+      return `File too large (${fileSizeMB.toFixed(1)}MB). Maximum: ${MAX_FILE_SIZE_MB}MB`;
+    }
+    
+    return null;
+  };
+
+  const handleUpload = async (file: File) => {
+    const validationError = validateFile(file);
+    if (validationError) {
+      error(validationError);
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setUploadProgress(0);
+
+      const scan = await apiClient.uploadScan(file, (progress) => {
+        setUploadProgress(Math.round(progress));
+      });
+
+      success(`File "${file.name}" uploaded successfully`);
+      setUploadProgress(0);
+      
+      // Reload scans list
+      await loadScans();
+    } catch (err: any) {
+      error(err.message || 'Upload failed');
+      console.error('Upload error:', err);
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleUpload(file);
+    }
+    // Reset input value to allow re-uploading the same file
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleUpload(file);
+    }
+  };
+
+  const handleDelete = async (scanId: string, filename: string) => {
+    if (!confirm(`Delete scan "${filename}"?`)) return;
+
+    try {
+      await apiClient.deleteScan(scanId);
+      success('Scan deleted successfully');
+      await loadScans();
+    } catch (err: any) {
+      error(err.message || 'Failed to delete scan');
+      console.error('Delete error:', err);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-500/10 text-green-400 border-green-500/20';
+      case 'running':
+        return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+      case 'failed':
+        return 'bg-red-500/10 text-red-400 border-red-500/20';
+      case 'uploaded':
+        return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+      default:
+        return 'bg-gray-500/10 text-gray-400 border-gray-500/20';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'check_circle';
+      case 'running':
+        return 'sync';
+      case 'failed':
+        return 'error';
+      case 'uploaded':
+        return 'upload_file';
+      default:
+        return 'help';
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background">
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-5">
@@ -17,13 +169,17 @@ const ScanUpload: React.FC = () => {
             <h2 className="text-white text-3xl font-bold leading-tight tracking-tight">Scan Upload</h2>
             <div className="flex items-center gap-2 text-secondary text-sm">
               <span className="material-symbols-outlined text-sm">upload_file</span>
-              <span>Import external vulnerability data</span>
+              <span>Import vulnerability scan files</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center justify-center gap-2 h-10 px-4 bg-[#283039] hover:bg-border text-white text-sm font-bold rounded-lg border border-border transition-colors">
-              <span className="material-symbols-outlined text-[20px]">help</span>
-              <span>Documentation</span>
+            <button 
+              onClick={loadScans}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 h-10 px-4 bg-[#283039] hover:bg-border text-white text-sm font-bold rounded-lg border border-border transition-colors disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-[20px]">refresh</span>
+              <span>Refresh</span>
             </button>
           </div>
         </div>
@@ -33,86 +189,135 @@ const ScanUpload: React.FC = () => {
         <div className="flex flex-col gap-8 max-w-[1400px] mx-auto w-full">
           {/* Upload Area */}
           <div className="w-full">
-            <label htmlFor="file-upload" className="group relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-border hover:border-primary/50 rounded-xl bg-surface/50 hover:bg-[#283039]/50 transition-all cursor-pointer">
+            <label
+              htmlFor="file-upload"
+              className={`group relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl transition-all cursor-pointer ${
+                dragActive
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border hover:border-primary/50 bg-surface/50 hover:bg-[#283039]/50'
+              } ${uploading ? 'pointer-events-none opacity-50' : ''}`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+            >
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <div className="p-4 rounded-full bg-[#283039] group-hover:bg-border mb-4 transition-colors">
-                  <span className="material-symbols-outlined text-4xl text-primary">cloud_upload</span>
-                </div>
-                <p className="mb-2 text-lg text-white font-medium"><span className="font-bold">Click to upload</span> or drag and drop</p>
-                <p className="text-sm text-secondary">Upload a Nessus XML file</p>
-                <p className="mt-2 text-xs text-[#586474] font-mono">Max file size: 500MB</p>
+                {uploading ? (
+                  <>
+                    <div className="p-4 rounded-full bg-[#283039] mb-4">
+                      <span className="material-symbols-outlined text-4xl text-primary animate-pulse">upload</span>
+                    </div>
+                    <p className="mb-2 text-lg text-white font-medium">Uploading... {uploadProgress}%</p>
+                    <div className="w-64 h-2 bg-[#283039] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-4 rounded-full bg-[#283039] group-hover:bg-border mb-4 transition-colors">
+                      <span className="material-symbols-outlined text-4xl text-primary">cloud_upload</span>
+                    </div>
+                    <p className="mb-2 text-lg text-white font-medium">
+                      <span className="font-bold">Click to upload</span> or drag and drop
+                    </p>
+                    <p className="text-sm text-secondary">
+                      Supported formats: {ALLOWED_EXTENSIONS.join(', ')}
+                    </p>
+                    <p className="mt-2 text-xs text-[#586474] font-mono">
+                      Max file size: {MAX_FILE_SIZE_MB}MB
+                    </p>
+                  </>
+                )}
               </div>
-              <input id="file-upload" type="file" className="hidden" accept=".xml" />
+              <input
+                ref={fileInputRef}
+                id="file-upload"
+                type="file"
+                className="hidden"
+                accept={ALLOWED_EXTENSIONS.join(',')}
+                onChange={handleFileSelect}
+                disabled={uploading}
+              />
             </label>
           </div>
 
           {/* Recent Uploads Table */}
           <div className="flex flex-col gap-4">
-            <h3 className="text-white text-xl font-bold leading-tight">Recent Uploads</h3>
-            <div className="overflow-hidden rounded-xl border border-border bg-surface">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-[#283039] text-secondary text-xs font-semibold uppercase tracking-wider border-b border-border">
-                      <th className="px-6 py-4">Filename</th>
-                      <th className="px-6 py-4">Team</th>
-                      <th className="px-6 py-4">Upload Date</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {recentUploads.map((file) => (
-                      <tr key={file.id} className="group hover:bg-[#283039]/50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 rounded bg-[#283039] text-secondary">
-                              <span className="material-symbols-outlined text-[20px]">description</span>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-white font-medium text-sm">{file.filename}</span>
-                              <span className="text-[#586474] text-xs">{file.size}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
-                             ${file.team === 'SEC' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 
-                               file.team === 'IT' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 
-                               'bg-orange-500/10 text-orange-400 border-orange-500/20'
-                             }`}>
-                             {file.team}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-secondary text-sm font-mono">{file.date}</td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border 
-                             ${file.status === 'RUNNING' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' : 
-                               file.status === 'PROCESSED' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 
-                               'bg-red-500/10 text-red-400 border-red-500/20'}`}>
-                             {file.status === 'RUNNING' && (
-                               <span className="relative flex h-2 w-2">
-                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
-                               </span>
-                             )}
-                             {file.status !== 'RUNNING' && <span className={`w-1.5 h-1.5 rounded-full ${file.status === 'PROCESSED' ? 'bg-green-500' : 'bg-red-500'}`}></span>}
-                             {file.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button className="text-secondary hover:text-white p-2 rounded hover:bg-border transition-colors">
-                            <span className="material-symbols-outlined text-[20px]">
-                              {file.status === 'RUNNING' ? 'cancel' : file.status === 'FAILED' ? 'refresh' : 'visibility'}
-                            </span>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="flex items-center justify-between">
+              <h3 className="text-white text-xl font-bold">Recent Uploads</h3>
+              <span className="text-secondary text-sm">{scans.length} scans</span>
             </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <span className="material-symbols-outlined text-4xl text-primary animate-pulse">sync</span>
+              </div>
+            ) : scans.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-secondary">
+                <span className="material-symbols-outlined text-6xl mb-4">cloud_off</span>
+                <p className="text-lg">No scans uploaded yet</p>
+                <p className="text-sm">Upload your first scan file to get started</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-border bg-surface">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-[#283039] text-secondary text-xs font-semibold uppercase tracking-wider border-b border-border">
+                        <th className="px-6 py-4">Filename</th>
+                        <th className="px-6 py-4">Size</th>
+                        <th className="px-6 py-4">Upload Date</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {scans.map((scan) => (
+                        <tr key={scan.id} className="group hover:bg-[#283039]/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded bg-[#283039] text-secondary">
+                                <span className="material-symbols-outlined text-[20px]">description</span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-white font-medium text-sm">{scan.filename}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-secondary text-sm">{scan.file_size_mb} MB</span>
+                          </td>
+                          <td className="px-6 py-4 text-secondary text-sm font-mono">{formatDate(scan.uploaded_at)}</td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(scan.status)}`}>
+                              {scan.status === 'running' && (
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                                </span>
+                              )}
+                              {scan.status !== 'running' && <span className="material-symbols-outlined text-sm">{getStatusIcon(scan.status)}</span>}
+                              {scan.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button 
+                              onClick={() => handleDelete(scan.id, scan.filename)}
+                              className="text-secondary hover:text-red-400 p-2 rounded hover:bg-border transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[20px]">delete</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

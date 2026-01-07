@@ -244,6 +244,32 @@ class UserService:
             await session.refresh(user)
         
         return user
+
+    @staticmethod
+    async def update_jira_base_url(
+        session: AsyncSession,
+        user_id: UUID,
+        jira_base_url: str
+    ) -> User | None:
+        """
+        Update user's Jira base URL.
+
+        Args:
+            session: Database session
+            user_id: User ID
+            jira_base_url: Base URL for the user's Jira instance (e.g. https://example.atlassian.net)
+
+        Returns:
+            Updated user object
+        """
+        user = await UserService.get_user_by_id(session, user_id)
+
+        if user:
+            user.jira_base_url = jira_base_url
+            await session.commit()
+            await session.refresh(user)
+
+        return user
     
     @staticmethod
     async def update_profile(

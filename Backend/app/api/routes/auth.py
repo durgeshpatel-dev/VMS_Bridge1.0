@@ -13,6 +13,7 @@ from app.api.schemas import (
     AuthResponse,
     JiraCredentialsUpdateRequest,
     JiraProjectKeysUpdateRequest,
+    JiraUrlUpdateRequest,
     MessageResponse,
     TokenRefreshRequest,
     TokenResponse,
@@ -369,6 +370,30 @@ async def update_jira_credentials(
             detail="User not found"
         )
     
+    return UserResponse.model_validate(user)
+
+
+@router.put("/me/jira/url", response_model=UserResponse)
+async def update_jira_base_url(
+    jira_data: JiraUrlUpdateRequest,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Update current user's Jira base URL.
+    """
+    user = await UserService.update_jira_base_url(
+        session=session,
+        user_id=current_user.id,
+        jira_base_url=jira_data.jira_base_url
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
     return UserResponse.model_validate(user)
 
 

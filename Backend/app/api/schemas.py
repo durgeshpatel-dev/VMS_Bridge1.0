@@ -49,6 +49,11 @@ class JiraProjectKeysUpdateRequest(BaseModel):
     project_keys: List[str] = Field(..., min_items=1)
 
 
+class JiraUrlUpdateRequest(BaseModel):
+    """Jira base URL update request."""
+    jira_base_url: str = Field(..., min_length=5, max_length=512)
+
+
 # Response schemas
 class UserResponse(BaseModel):
     """User response data."""
@@ -57,6 +62,7 @@ class UserResponse(BaseModel):
     full_name: str
     is_active: bool
     jira_project_keys: List[str] | None = None
+    jira_base_url: str | None = None
     created_at: datetime
     last_login: datetime | None = None
     

@@ -22,8 +22,10 @@ const Settings: React.FC = () => {
   
   // Jira state
   const [jiraApiToken, setJiraApiToken] = useState('');
+  const [jiraBaseUrl, setJiraBaseUrl] = useState('');
   const [showJiraToken, setShowJiraToken] = useState(false);
   const [isJiraLoading, setIsJiraLoading] = useState(false);
+  const [isJiraUrlLoading, setIsJiraUrlLoading] = useState(false);
   const [newProjectKey, setNewProjectKey] = useState('');
   const [isAddingProject, setIsAddingProject] = useState(false);
 
@@ -32,6 +34,7 @@ const Settings: React.FC = () => {
     if (user) {
       setFullName(user.full_name);
       setEmail(user.email);
+      setJiraBaseUrl(user.jira_base_url || '');
     }
   }, [user]);
 
@@ -97,6 +100,35 @@ const Settings: React.FC = () => {
       toastError(err instanceof Error ? err.message : 'Failed to update Jira credentials');
     } finally {
       setIsJiraLoading(false);
+    }
+  };
+
+  const handleJiraUrlUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!jiraBaseUrl.trim()) {
+      toastError('Jira URL is required');
+      return;
+    }
+    
+    // Basic URL validation
+    try {
+      new URL(jiraBaseUrl);
+    } catch {
+      toastError('Please enter a valid URL (e.g., https://example.atlassian.net)');
+      return;
+    }
+    
+    setIsJiraUrlLoading(true);
+    
+    try {
+      await apiClient.updateJiraUrl(jiraBaseUrl);
+      await refreshUser();
+      success('Jira URL updated successfully');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Failed to update Jira URL');
+    } finally {
+      setIsJiraUrlLoading(false);
     }
   };
 
@@ -299,6 +331,34 @@ const Settings: React.FC = () => {
                 </div>
               )}
             </div>
+            
+            {/* Jira Base URL Form */}
+            <form onSubmit={handleJiraUrlUpdate} className="p-6 border-b border-border bg-[#1c2127]/30">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-white">Jira Base URL</span>
+                <div className="flex gap-3">
+                  <input 
+                    className="flex-1 rounded-lg border-border bg-[#1c2127] text-white focus:border-primary focus:ring-primary h-11 px-4 text-sm" 
+                    type="url"
+                    value={jiraBaseUrl}
+                    onChange={(e) => setJiraBaseUrl(e.target.value)}
+                    placeholder="https://your-domain.atlassian.net"
+                  />
+                  <button 
+                    type="submit"
+                    disabled={isJiraUrlLoading}
+                    className="px-5 py-2.5 bg-primary hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-900/20 disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {isJiraUrlLoading ? 'Saving...' : 'Save URL'}
+                  </button>
+                </div>
+                <p className="text-xs text-secondary">
+                  Your Jira instance URL (e.g., https://example.atlassian.net)
+                </p>
+              </label>
+            </form>
+            
+            {/* Jira API Token Form */}
             <form onSubmit={handleJiraUpdate} className="p-6 grid grid-cols-1 gap-6">
               <label className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-white">Jira API Token</span>

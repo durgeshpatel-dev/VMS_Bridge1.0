@@ -39,6 +39,8 @@ class User(Base):
     jira_project_keys: Mapped[list[str] | None] = mapped_column(
         ARRAY(String(20)), nullable=True
     )
+    # Base URL for user's Jira instance (e.g. https://example.atlassian.net)
+    jira_base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -51,28 +53,56 @@ class User(Base):
 
 
 class Scan(Base):
+    """
+    Scans table for tracking uploaded vulnerability scan files.
+    Each scan belongs to a user and stores file metadata.
+    """
     __tablename__ = "scans"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    status: Mapped[str] = mapped_column(String(32), default="queued", nullable=False)
-    source: Mapped[str | None] = mapped_column(String(128), nullable=True)
-
-    started_at: Mapped[dt.datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+        nullable=False
     )
-    finished_at: Mapped[dt.datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+    
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
     )
-
+    
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    file_size_mb: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0")
+    )
+    
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="uploaded",
+        server_default=text("'uploaded'")
+    )
+    
+    uploaded_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        nullable=False
+    )
+    processed_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+    
+    # Keep metadata for additional scan information
     scan_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
-    created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), default=dt.datetime.utcnow, nullable=False
-    )
-    updated_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), default=dt.datetime.utcnow, nullable=False
-    )
-
+    # Relationships
+    user: Mapped["User"] = relationship("User", backref="scans")
     vulnerabilities: Mapped[list["Vulnerability"]] = relationship(
         back_populates="scan", cascade="all, delete-orphan"
     )
@@ -82,8 +112,11 @@ class Vulnerability(Base):
     __tablename__ = "vulnerabilities"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    scan_id: Mapped[int] = mapped_column(
-        ForeignKey("scans.id", ondelete="CASCADE"), nullable=False, index=True
+    scan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("scans.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
     )
 
     title: Mapped[str] = mapped_column(String(256), nullable=False)

@@ -25,9 +25,11 @@ app.add_middleware(
 # Include API routers
 from app.api.routes.health import router as health_router
 from app.api.routes.auth import router as auth_router
+from app.api.routes.scans import router as scans_router
 
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(scans_router)
 
 
 @app.get("/health")

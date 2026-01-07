@@ -10,8 +10,19 @@ export interface User {
   full_name: string;
   is_active: boolean;
   jira_project_keys: string[] | null;
+  jira_base_url: string | null;
   created_at: string;
   last_login: string | null;
+}
+
+export interface Scan {
+  id: string;
+  filename: string;
+  file_size_mb: number;
+  status: 'uploaded' | 'running' | 'completed' | 'failed';
+  uploaded_at: string;
+  processed_at: string | null;
+  metadata?: any;
 }
 
 export interface AuthResponse {
@@ -215,6 +226,15 @@ class ApiClient {
     return response;
   }
 
+  async updateJiraUrl(jiraBaseUrl: string): Promise<User> {
+    const response = await this.request<User>('/auth/me/jira/url', {
+      method: 'PUT',
+      body: JSON.stringify({ jira_base_url: jiraBaseUrl }),
+    });
+    localStorage.setItem('user', JSON.stringify(response));
+    return response;
+  }
+
   async updateJiraProjects(projectKeys: string[]): Promise<User> {
     const response = await this.request<User>('/auth/me/jira/projects', {
       method: 'PUT',
@@ -238,6 +258,74 @@ class ApiClient {
     });
     localStorage.setItem('user', JSON.stringify(response));
     return response;
+  }
+
+  // Scan endpoints
+  async uploadScan(file: File, onProgress?: (progress: number) => void): Promise<Scan> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Track upload progress
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const progress = (e.loaded / e.total) * 100;
+            onProgress(progress);
+          }
+        });
+      }
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response);
+          } catch (error) {
+            reject(new Error('Invalid response format'));
+          }
+        } else {
+          try {
+            const error = JSON.parse(xhr.responseText);
+            reject(new Error(error.detail || `Upload failed: ${xhr.status}`));
+          } catch {
+            reject(new Error(`Upload failed: ${xhr.status}`));
+          }
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during upload'));
+      });
+
+      xhr.addEventListener('abort', () => {
+        reject(new Error('Upload cancelled'));
+      });
+
+      xhr.open('POST', `${API_BASE_URL}/scans/upload`);
+      
+      // Add Authorization header
+      if (this.accessToken) {
+        xhr.setRequestHeader('Authorization', `Bearer ${this.accessToken}`);
+      }
+
+      xhr.send(formData);
+    });
+  }
+
+  async listScans(): Promise<Scan[]> {
+    return this.request<Scan[]>('/scans');
+  }
+
+  async getScan(scanId: string): Promise<Scan> {
+    return this.request<Scan>(`/scans/${scanId}`);
+  }
+
+  async deleteScan(scanId: string): Promise<{ message: string }> {
+    return this.request(`/scans/${scanId}`, {
+      method: 'DELETE',
+    });
   }
 }
 
