@@ -281,7 +281,8 @@ async def parse_scan(job_payload: dict):
     print(f"   File: {file_path}")
     print(f"{'='*60}")
     
-    async with await get_db_session() as db:
+    # FIX: Remove 'await' before get_db_session()
+    async with AsyncSessionLocal() as db:
         try:
             # Mark job as running
             await update_job_status(db, job_id, 'running', progress=0)
@@ -304,12 +305,15 @@ async def parse_scan(job_payload: dict):
             if scan:
                 scan.processed_at = datetime.utcnow()
                 scan.status = 'processed'
-                await db.commit()
+                await db.commit()  # Final commit for scan update
                 print(f"✓ Scan {scan_id} marked as processed")
             
             print(f"✅ Job {job_id} completed successfully\n")
             
         except Exception as e:
+            # Rollback on error
+            await db.rollback()
+            
             # Mark job as failed
             error_msg = f"{type(e).__name__}: {str(e)}"
             await update_job_status(
