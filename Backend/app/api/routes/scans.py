@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.auth import get_current_user
+from app.core.queue import enqueue_job
 from app.db.models import Scan, User
 from app.db.session import get_db
 
@@ -90,32 +91,75 @@ async def upload_scan(
     await db.commit()
     await db.refresh(scan)
     
+    # Enqueue background job for scan processing
+    try:
+        job_id = await enqueue_job(
+            db=db,
+            job_type='parse_scan',
+            scan_id=scan.id,
+            user_id=current_user.id,
+            file_path=str(file_path.relative_to(UPLOAD_DIR.parent)),
+            metadata={
+                'filename': file.filename,
+                'file_size_mb': scan.file_size_mb,
+                'source': 'upload_endpoint'
+            }
+        )
+    except Exception as e:
+        # Log error but don't fail the upload
+        # Scan is already persisted, job can be retried later
+        print(f"Warning: Failed to enqueue job for scan {scan.id}: {str(e)}")
+        job_id = None
+    
     return {
         "id": str(scan.id),
         "filename": scan.filename,
         "file_size_mb": scan.file_size_mb,
         "status": scan.status,
         "uploaded_at": scan.uploaded_at.isoformat(),
+        "job_id": str(job_id) if job_id else None,
     }
 
 
 @router.get("/")
 async def list_scans(
+    skip: int = 0,
+    limit: int = 50,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List all scans for the current user."""
-    from sqlalchemy import select
+    """List all scans for the current user with their latest job status."""
+    from sqlalchemy import select, func
+    from app.db.models import Job
     
+    # Get total count
+    count_result = await db.execute(
+        select(func.count()).select_from(Scan).where(Scan.user_id == current_user.id)
+    )
+    total = count_result.scalar()
+    
+    # Get paginated scans
     result = await db.execute(
         select(Scan)
         .where(Scan.user_id == current_user.id)
         .order_by(Scan.uploaded_at.desc())
+        .offset(skip)
+        .limit(limit)
     )
     scans = result.scalars().all()
     
-    return [
-        {
+    scans_with_jobs = []
+    for scan in scans:
+        # Get latest job for this scan
+        job_result = await db.execute(
+            select(Job)
+            .where(Job.scan_id == scan.id)
+            .order_by(Job.created_at.desc())
+            .limit(1)
+        )
+        latest_job = job_result.scalar_one_or_none()
+        
+        scan_data = {
             "id": str(scan.id),
             "filename": scan.filename,
             "file_size_mb": scan.file_size_mb,
@@ -123,8 +167,25 @@ async def list_scans(
             "uploaded_at": scan.uploaded_at.isoformat(),
             "processed_at": scan.processed_at.isoformat() if scan.processed_at else None,
         }
-        for scan in scans
-    ]
+        
+        if latest_job:
+            scan_data["job"] = {
+                "id": str(latest_job.id),
+                "status": latest_job.status,
+                "progress": latest_job.progress,
+                "job_type": latest_job.job_type,
+            }
+        else:
+            scan_data["job"] = None
+        
+        scans_with_jobs.append(scan_data)
+    
+    return {
+        "items": scans_with_jobs,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
 
 
 @router.get("/{scan_id}")

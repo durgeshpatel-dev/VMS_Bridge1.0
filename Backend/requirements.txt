@@ -16,3 +16,9 @@ python-multipart==0.0.6
 
 # Testing
 httpx==0.25.2
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# Job Queue
+redis==5.0.1
+dramatiq[redis]==1.16.0

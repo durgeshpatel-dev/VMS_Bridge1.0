@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -50,6 +51,13 @@ class User(Base):
     last_login: Mapped[dt.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    # Relationships
+    scans: Mapped[list["Scan"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    assets: Mapped[list["Asset"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    vulnerabilities: Mapped[list["Vulnerability"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    jira_tickets: Mapped[list["JiraTicket"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    jobs: Mapped[list["Job"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Scan(Base):
@@ -102,85 +110,309 @@ class Scan(Base):
     scan_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # Relationships
-    user: Mapped["User"] = relationship("User", backref="scans")
+    user: Mapped["User"] = relationship("User", back_populates="scans")
     vulnerabilities: Mapped[list["Vulnerability"]] = relationship(
+        back_populates="scan", cascade="all, delete-orphan"
+    )
+    jobs: Mapped[list["Job"]] = relationship(
         back_populates="scan", cascade="all, delete-orphan"
     )
 
 
+class Asset(Base):
+    """
+    Assets table for tracking targets like servers, APIs, infrastructure.
+    Each asset is unique per user and tracks when it was first and last seen.
+    """
+    __tablename__ = "assets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+        nullable=False
+    )
+    
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    
+    asset_identifier: Mapped[str] = mapped_column(String(255), nullable=False)
+    asset_type: Mapped[str] = mapped_column(
+        String(50), 
+        nullable=False,
+        index=True
+    )
+    
+    asset_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    
+    first_seen: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        nullable=False
+    )
+    last_seen: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        nullable=False,
+        index=True
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="assets")
+    vulnerabilities: Mapped[list["Vulnerability"]] = relationship(
+        back_populates="asset", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        Index("uq_user_asset", "user_id", "asset_identifier", unique=True),
+        CheckConstraint(
+            "asset_type IN ('server', 'api', 'load_balancer', 'application', 'network_device', 'other')",
+            name="ck_asset_type"
+        ),
+    )
+
+
 class Vulnerability(Base):
+    """
+    Vulnerabilities table for actual security findings.
+    Links to user, scan, and asset with full tracking of severity, status, and lifecycle.
+    """
     __tablename__ = "vulnerabilities"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+        nullable=False
+    )
+    
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
     scan_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("scans.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
-
-    title: Mapped[str] = mapped_column(String(256), nullable=False)
-    severity: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    cve: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
-    package_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    installed_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    fixed_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
-
-    raw: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-
-    created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), default=dt.datetime.utcnow, nullable=False
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("assets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
     )
 
+    plugin_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    cve_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    remediation: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    scanner_severity: Mapped[str | None] = mapped_column(
+        String(20), 
+        nullable=True,
+        index=True
+    )
+    
+    cvss_score: Mapped[Decimal | None] = mapped_column(
+        Numeric(3, 1),
+        nullable=True
+    )
+    cvss_vector: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    
+    ml_predicted_risk: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    risk_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    
+    port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    protocol: Mapped[str | None] = mapped_column(String(10), nullable=True)
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default=text("'open'"),
+        index=True
+    )
+
+    discovered_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        nullable=False
+    )
+    last_seen: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        nullable=False
+    )
+    closed_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="vulnerabilities")
     scan: Mapped["Scan"] = relationship(back_populates="vulnerabilities")
+    asset: Mapped["Asset"] = relationship(back_populates="vulnerabilities")
+    jira_ticket: Mapped["JiraTicket | None"] = relationship(
+        back_populates="vulnerability", cascade="all, delete-orphan", uselist=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "scanner_severity IN ('critical', 'high', 'medium', 'low', 'info')",
+            name="ck_scanner_severity"
+        ),
+        CheckConstraint(
+            "cvss_score BETWEEN 0.0 AND 10.0",
+            name="ck_cvss_score"
+        ),
+        CheckConstraint(
+            "ml_predicted_risk IN ('critical', 'high', 'medium', 'low', 'info')",
+            name="ck_ml_predicted_risk"
+        ),
+        CheckConstraint(
+            "risk_score BETWEEN 0 AND 100",
+            name="ck_risk_score"
+        ),
+        CheckConstraint(
+            "status IN ('open', 'ignored', 'fixed', 'false_positive')",
+            name="ck_status"
+        ),
+    )
+
+
+class JiraTicket(Base):
+    """
+    Jira tickets table for external tracking reference.
+    One vulnerability maps to exactly one Jira ticket (enforced by UNIQUE constraint).
+    """
+    __tablename__ = "jira_tickets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+        nullable=False
+    )
+    
+    vulnerability_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("vulnerabilities.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True
+    )
+    
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    
+    jira_ticket_key: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    jira_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    jira_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        nullable=False
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="jira_tickets")
+    vulnerability: Mapped["Vulnerability"] = relationship(back_populates="jira_ticket")
 
 
 class Job(Base):
+    """
+    Jobs table for background processing and async visibility.
+    Tracks parsing, ML analysis, Jira creation, and report generation tasks.
+    """
     __tablename__ = "jobs"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+        nullable=False
+    )
+    
+    scan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("scans.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
 
-    job_type: Mapped[str] = mapped_column(String(64), nullable=False)
-    status: Mapped[str] = mapped_column(String(32), default="queued", nullable=False)
-
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    job_type: Mapped[str] = mapped_column(
+        String(50), 
+        nullable=False,
+        index=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default=text("'pending'"),
+        index=True
+    )
+    
+    progress: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), default=dt.datetime.utcnow, nullable=False
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        nullable=False
     )
-    updated_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), default=dt.datetime.utcnow, nullable=False
-    )
-
     started_at: Mapped[dt.datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        DateTime(timezone=True),
+        nullable=True
     )
-    finished_at: Mapped[dt.datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
-
-class JiraProject(Base):
-    __tablename__ = "jira_projects"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-
-    project_key: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
-    name: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    url: Mapped[str | None] = mapped_column(String(512), nullable=True)
-
-    settings: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-
-    created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), default=dt.datetime.utcnow, nullable=False
-    )
-    updated_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), default=dt.datetime.utcnow, nullable=False
+    completed_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
     )
 
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="jobs")
+    scan: Mapped["Scan"] = relationship(back_populates="jobs")
 
-Index("ix_jobs_job_type", Job.job_type)
-Index("ix_scans_status", Scan.status)
+    __table_args__ = (
+        CheckConstraint(
+            "job_type IN ('parse_scan', 'ml_analysis', 'jira_creation', 'report_generation')",
+            name="ck_job_type"
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'running', 'completed', 'failed', 'cancelled')",
+            name="ck_status"
+        ),
+        CheckConstraint(
+            "progress BETWEEN 0 AND 100",
+            name="ck_progress"
+        ),
+    )
+
+
+# Removed old index definitions - now using __table_args__ in model classes

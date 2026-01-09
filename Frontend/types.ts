@@ -44,3 +44,10 @@ export interface UploadedScan {
   date: string;
   status: 'RUNNING' | 'PROCESSED' | 'FAILED';
 }
+
+export interface Job {
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  progress: number | null;
+  job_type: string;
+}

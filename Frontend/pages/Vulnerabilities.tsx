@@ -1,203 +1,379 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Severity } from '../types';
-import { VulnList } from '../data';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { apiClient, Vulnerability, VulnerabilityListResponse } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 
 const Vulnerabilities: React.FC = () => {
+    
   const navigate = useNavigate();
-  const [selectedId, setSelectedId] = useState<string | null>('1');
+  const [searchParams] = useSearchParams();
+  const { showToast } = useToast();
+  const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  
+  // Filters
+  const scanIdFromUrl = searchParams.get('scan_id');
+  const [severityFilter, setSeverityFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  const [limit] = useState(50);
 
-  const selectedVuln = VulnList.find(v => v.id === selectedId);
+  const selectedVuln = vulnerabilities.find(v => v.id === selectedId);
+
+  const loadVulnerabilities = async () => {
+    try {
+      setLoading(true);
+      const response: VulnerabilityListResponse = await apiClient.listVulnerabilities({
+        severity: severityFilter || undefined,
+        status: statusFilter || undefined,
+        scan_id: scanIdFromUrl || undefined,
+        search: searchTerm || undefined,
+        skip: page * limit,
+        limit,
+      });
+      
+      setVulnerabilities(response.items);
+      setTotal(response.total);
+      
+      // Auto-select first item if none selected
+      if (response.items.length > 0 && !selectedId) {
+        setSelectedId(response.items[0].id);
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Failed to load vulnerabilities', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadVulnerabilities();
+  }, [severityFilter, statusFilter, searchTerm, page]);
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'critical': return 'bg-red-900/30 text-red-400 border-red-800';
+      case 'high': return 'bg-orange-900/30 text-orange-400 border-orange-800';
+      case 'medium': return 'bg-yellow-900/30 text-yellow-400 border-yellow-800';
+      case 'low': return 'bg-blue-900/30 text-blue-400 border-blue-800';
+      case 'info': return 'bg-gray-700/30 text-gray-400 border-gray-600';
+      default: return 'bg-surface text-secondary border-border';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'open': return 'bg-red-900/30 text-red-400 border-red-800';
+      case 'in_progress': return 'bg-yellow-900/30 text-yellow-400 border-yellow-800';
+      case 'resolved': return 'bg-emerald-900/30 text-emerald-400 border-emerald-800';
+      case 'false_positive': return 'bg-gray-700/30 text-gray-400 border-gray-600';
+      default: return 'bg-surface text-secondary border-border';
+    }
+  };
+
+  const severityCounts = {
+    critical: vulnerabilities.filter(v => v.scanner_severity === 'critical').length,
+    high: vulnerabilities.filter(v => v.scanner_severity === 'high').length,
+    medium: vulnerabilities.filter(v => v.scanner_severity === 'medium').length,
+    low: vulnerabilities.filter(v => v.scanner_severity === 'low').length,
+    info: vulnerabilities.filter(v => v.scanner_severity === 'info').length,
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background">
       {/* Header */}
       <div className="h-14 flex items-center justify-between px-6 border-b border-border bg-background shrink-0">
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-secondary">Scans</span>
-          <span className="material-symbols-outlined text-secondary text-xs">chevron_right</span>
-          <span className="font-semibold text-white">Production-Full-Scan-2023-10-27</span>
-          <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-900/30 text-emerald-400 border border-emerald-800">Completed</span>
+          <span className="font-semibold text-white">Vulnerabilities</span>
+          <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-surface text-secondary">{total} total</span>
+          {scanIdFromUrl && (
+            <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/20 text-primary border border-primary/50 flex items-center gap-1">
+              Filtered by Scan
+              <button 
+                onClick={() => navigate('/vulnerabilities')}
+                className="hover:text-white"
+                title="Clear scan filter"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-primary rounded hover:bg-blue-600 transition-colors shadow-sm">
-            <span className="material-symbols-outlined text-sm">play_arrow</span>
-            Re-scan
-          </button>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search vulnerabilities..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-64 px-3 py-1.5 pl-9 text-sm bg-surface border border-border rounded text-white placeholder-secondary focus:outline-none focus:border-primary"
+            />
+            <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-secondary text-sm">search</span>
+          </div>
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Main List */}
         <div className="flex-1 flex flex-col min-w-0 bg-background">
-           <div className="p-4 flex items-center justify-between gap-4">
+          <div className="p-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button 
+                onClick={() => setSeverityFilter('')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  severityFilter === '' 
+                    ? 'bg-primary text-white' 
+                    : 'bg-surface text-secondary hover:text-white hover:bg-border'
+                }`}
+              >
+                All ({total})
+              </button>
+              <button 
+                onClick={() => setSeverityFilter('critical')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                  severityFilter === 'critical' 
+                    ? 'bg-red-900/30 text-red-400 border-red-800' 
+                    : 'bg-red-900/20 text-red-400 border-transparent hover:border-red-800'
+                }`}
+              >
+                Critical ({severityCounts.critical})
+              </button>
+              <button 
+                onClick={() => setSeverityFilter('high')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                  severityFilter === 'high' 
+                    ? 'bg-orange-900/30 text-orange-400 border-orange-800' 
+                    : 'bg-orange-900/20 text-orange-400 border-transparent hover:border-orange-800'
+                }`}
+              >
+                High ({severityCounts.high})
+              </button>
+              <button 
+                onClick={() => setSeverityFilter('medium')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                  severityFilter === 'medium' 
+                    ? 'bg-yellow-900/30 text-yellow-400 border-yellow-800' 
+                    : 'bg-yellow-900/20 text-yellow-400 border-transparent hover:border-yellow-800'
+                }`}
+              >
+                Medium ({severityCounts.medium})
+              </button>
+              <button 
+                onClick={() => setSeverityFilter('low')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                  severityFilter === 'low' 
+                    ? 'bg-blue-900/30 text-blue-400 border-blue-800' 
+                    : 'bg-blue-900/20 text-blue-400 border-transparent hover:border-blue-800'
+                }`}
+              >
+                Low ({severityCounts.low})
+              </button>
+            </div>
             <div className="flex items-center gap-2">
-              <button className="px-3 py-1.5 text-xs font-medium rounded-full bg-surface text-secondary hover:text-white hover:bg-border transition-colors">All (420)</button>
-              <button className="px-3 py-1.5 text-xs font-medium rounded-full bg-red-900/20 text-red-400 border border-transparent hover:border-red-800 transition-colors">Critical (12)</button>
-              <button className="px-3 py-1.5 text-xs font-medium rounded-full bg-orange-900/20 text-orange-400 border border-transparent hover:border-orange-800 transition-colors">High (45)</button>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-1.5 text-xs bg-surface border border-border rounded text-white focus:outline-none focus:border-primary"
+              >
+                <option value="">All Status</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="false_positive">False Positive</option>
+              </select>
             </div>
-            <div className="flex items-center gap-2 text-secondary">
-               <span className="material-symbols-outlined p-1 hover:bg-surface rounded cursor-pointer">filter_list</span>
-               <span className="material-symbols-outlined p-1 hover:bg-surface rounded cursor-pointer">sort</span>
-            </div>
-           </div>
+          </div>
 
-           <div className="flex-1 overflow-auto px-4 pb-4 custom-scroll">
+          <div className="flex-1 overflow-auto px-4 pb-4 custom-scroll">
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-secondary">Loading vulnerabilities...</div>
+              </div>
+            ) : vulnerabilities.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-secondary">
+                <span className="material-symbols-outlined text-4xl mb-2">search_off</span>
+                <p>No vulnerabilities found</p>
+              </div>
+            ) : (
               <table className="w-full text-left border-collapse">
-                 <thead className="bg-surface/50 sticky top-0 z-10 backdrop-blur-sm">
-                    <tr>
-                       <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider rounded-tl-lg rounded-bl-lg">Severity</th>
-                       <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">Vulnerability</th>
-                       <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">Asset</th>
-                       <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">Discovered</th>
-                       <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider rounded-tr-lg rounded-br-lg text-right">Action</th>
+                <thead className="bg-surface/50 sticky top-0 z-10 backdrop-blur-sm">
+                  <tr>
+                    <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">Severity</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">Vulnerability</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">Asset</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">CVE</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">Port</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {vulnerabilities.map((vuln) => (
+                    <tr 
+                      key={vuln.id}
+                      onClick={() => setSelectedId(vuln.id)}
+                      className={`cursor-pointer transition-colors ${
+                        selectedId === vuln.id 
+                          ? 'bg-primary/10 border-l-2 border-l-primary' 
+                          : 'hover:bg-surface/50'
+                      }`}
+                    >
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded text-xs font-medium uppercase border ${getSeverityColor(vuln.scanner_severity)}`}>
+                          {vuln.scanner_severity}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="text-sm font-medium text-white">{vuln.title}</div>
+                        {vuln.cvss_score && (
+                          <div className="text-xs text-secondary mt-1">CVSS: {vuln.cvss_score.toFixed(1)}</div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-secondary">
+                        {vuln.asset?.asset_identifier || 'Unknown'}
+                      </td>
+                      <td className="py-3 px-4">
+                        {vuln.cve_id ? (
+                          <span className="text-sm font-mono text-blue-400">{vuln.cve_id}</span>
+                        ) : (
+                          <span className="text-xs text-secondary">N/A</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-secondary">
+                        {vuln.port ? `${vuln.port}/${vuln.protocol || 'tcp'}` : 'N/A'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded text-xs font-medium capitalize border ${getStatusColor(vuln.status)}`}>
+                          {vuln.status.replace('_', ' ')}
+                        </span>
+                      </td>
                     </tr>
-                 </thead>
-                 <tbody className="divide-y divide-border text-sm">
-                    {VulnList.map(v => (
-                      <tr 
-                        key={v.id} 
-                        onClick={() => setSelectedId(v.id)}
-                        className={`group cursor-pointer transition-colors border-l-4 ${selectedId === v.id ? 'bg-blue-900/10 border-primary' : 'hover:bg-surface/50 border-transparent'}`}
-                      >
-                         <td className="py-4 px-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium 
-                               ${v.severity === Severity.CRITICAL ? 'bg-red-900/50 text-red-300' : 
-                                 v.severity === Severity.HIGH ? 'bg-orange-900/50 text-orange-300' :
-                                 v.severity === Severity.MEDIUM ? 'bg-yellow-900/50 text-yellow-300' :
-                                 'bg-slate-700 text-slate-300'}`}>
-                               {v.severity}
-                            </span>
-                         </td>
-                         <td className="py-4 px-4">
-                            <div className="font-medium text-white group-hover:text-primary transition-colors">{v.name}</div>
-                            <div className="text-xs text-secondary mt-0.5">{v.cve}</div>
-                         </td>
-                         <td className="py-4 px-4 text-slate-300">{v.asset}</td>
-                         <td className="py-4 px-4 text-secondary whitespace-nowrap">{v.discoveredAt}</td>
-                         <td className="py-4 px-4 text-right">
-                            <button className="text-xs font-medium text-primary hover:text-blue-400">View</button>
-                         </td>
-                      </tr>
-                    ))}
-                 </tbody>
+                  ))}
+                </tbody>
               </table>
-           </div>
+            )}
+          </div>
         </div>
 
-        {/* Detail Panel */}
-        <aside className={`w-[450px] flex flex-col border-l border-border bg-surface shadow-xl z-10 transition-all duration-300 transform ${selectedId ? 'translate-x-0' : 'translate-x-full'}`}>
-           {selectedId && selectedVuln && (
-             <>
-               <div className="h-14 flex items-center justify-between px-6 border-b border-border shrink-0">
-                  <h3 className="font-semibold text-white flex items-center gap-2">
-                     <span className="material-symbols-outlined text-primary text-lg">manage_search</span>
-                     Finding Details
-                  </h3>
-                  <div className="flex items-center gap-2">
-                     <button 
-                        onClick={() => navigate(`/reports?id=${selectedId}`)}
-                        className="p-1.5 text-secondary hover:text-white hover:bg-slate-700 rounded transition-colors"
-                        title="Open Full Report"
-                     >
-                        <span className="material-symbols-outlined text-lg">open_in_full</span>
-                     </button>
-                     <button onClick={() => setSelectedId(null)} className="p-1.5 text-secondary hover:text-white hover:bg-slate-700 rounded transition-colors">
-                        <span className="material-symbols-outlined text-lg">close</span>
-                     </button>
+        {/* Details Panel */}
+        {selectedVuln && (
+          <div className="w-[500px] border-l border-border bg-background overflow-auto custom-scroll shrink-0">
+            <div className="p-6 space-y-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold text-white mb-2">{selectedVuln.title}</h2>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`px-2 py-1 rounded text-xs font-medium uppercase border ${getSeverityColor(selectedVuln.scanner_severity)}`}>
+                      {selectedVuln.scanner_severity}
+                    </span>
+                    <span className={`px-2 py-1 rounded text-xs font-medium capitalize border ${getStatusColor(selectedVuln.status)}`}>
+                      {selectedVuln.status.replace('_', ' ')}
+                    </span>
+                    {selectedVuln.cvss_score && (
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-surface text-white border border-border">
+                        CVSS: {selectedVuln.cvss_score.toFixed(1)}
+                      </span>
+                    )}
                   </div>
-               </div>
-               
-               <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scroll">
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => navigate(`/reports?id=${selectedVuln.id}`)}
+                    className="p-2 hover:bg-surface rounded transition-colors"
+                    title="Open Full Report"
+                  >
+                    <span className="material-symbols-outlined text-secondary hover:text-primary">open_in_full</span>
+                  </button>
+                  <button 
+                    onClick={() => setSelectedId(null)}
+                    className="p-2 hover:bg-surface rounded transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-secondary">close</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-2">Asset Information</h3>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-secondary">Identifier:</span>
+                      <span className="text-white font-mono">{selectedVuln.asset?.asset_identifier || 'Unknown'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-secondary">Type:</span>
+                      <span className="text-white capitalize">{selectedVuln.asset?.asset_type || 'Unknown'}</span>
+                    </div>
+                    {selectedVuln.port && (
+                      <div className="flex justify-between">
+                        <span className="text-secondary">Port/Protocol:</span>
+                        <span className="text-white">{selectedVuln.port}/{selectedVuln.protocol || 'tcp'}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {selectedVuln.cve_id && (
                   <div>
-                     <div className="flex items-start justify-between">
-                        <h2 className="text-xl font-bold text-white leading-snug">{selectedVuln.name}</h2>
-                        <span className="material-symbols-outlined text-secondary text-sm cursor-pointer hover:text-primary">link</span>
-                     </div>
-                     <p className="text-xs font-mono text-secondary mt-1">{selectedVuln.cve} • Detected in <span className="text-primary cursor-pointer hover:underline">{selectedVuln.asset}</span></p>
+                    <h3 className="text-sm font-semibold text-white mb-2">CVE Information</h3>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-secondary">CVE ID:</span>
+                        <a 
+                          href={`https://nvd.nist.gov/vuln/detail/${selectedVuln.cve_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:underline font-mono"
+                        >
+                          {selectedVuln.cve_id}
+                        </a>
+                      </div>
+                      {selectedVuln.cvss_vector && (
+                        <div className="flex justify-between">
+                          <span className="text-secondary">CVSS Vector:</span>
+                          <span className="text-white font-mono text-xs">{selectedVuln.cvss_vector}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                )}
 
-                  <div className="grid grid-cols-2 gap-3">
-                     <div className="bg-red-900/10 border border-red-900/30 rounded p-3 flex flex-col items-start">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-red-400/70 mb-1">Scanner Severity</span>
-                        <div className="flex items-center gap-1.5">
-                           <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                           <span className="font-bold text-red-400">{selectedVuln.severity}</span>
-                        </div>
-                     </div>
-                     <div className="bg-purple-900/10 border border-purple-900/30 rounded p-3 flex flex-col items-start relative overflow-hidden">
-                        <div className="absolute -right-2 -top-2 opacity-10">
-                           <span className="material-symbols-outlined text-5xl text-purple-600">psychology</span>
-                        </div>
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-purple-400/70 mb-1 flex items-center gap-1">
-                           ML Predicted Risk
-                           <span className="material-symbols-outlined text-[10px]">auto_awesome</span>
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                           <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
-                           <span className="font-bold text-purple-300">Extreme</span>
-                        </div>
-                     </div>
+                {selectedVuln.description && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-white mb-2">Description</h3>
+                    <p className="text-sm text-secondary leading-relaxed whitespace-pre-wrap">{selectedVuln.description.trim()}</p>
                   </div>
+                )}
 
-                  <div className="text-sm text-slate-300 leading-relaxed">
-                     {selectedVuln.description}
+                {selectedVuln.remediation && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-white mb-2">Remediation</h3>
+                    <p className="text-sm text-secondary leading-relaxed whitespace-pre-wrap">{selectedVuln.remediation.trim()}</p>
                   </div>
+                )}
 
-                  {/* AI Remediation */}
-                  <div className="rounded border border-indigo-900/40 bg-surface overflow-hidden">
-                     <div className="px-4 py-2 border-b border-indigo-900/40 bg-surface flex items-center justify-between">
-                        <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
-                           <span className="material-symbols-outlined text-sm">smart_toy</span>
-                           ML Remediation Hint
-                        </span>
-                        <span className="text-[10px] text-secondary">Confidence: 98%</span>
-                     </div>
-                     <div className="p-4">
-                        <p className="text-xs text-secondary mb-3">Suggested Remediation:</p>
-                        <div className="relative group">
-                           <pre className="bg-background text-slate-300 text-xs p-3 rounded font-mono overflow-x-auto border border-border whitespace-pre-wrap">{selectedVuln.remediation}</pre>
-                           <button className="absolute top-2 right-2 p-1 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Copy">
-                              <span className="material-symbols-outlined text-xs">content_copy</span>
-                           </button>
-                        </div>
-                        <div className="mt-3 flex items-start gap-2 text-[10px] text-secondary italic">
-                           <span className="material-symbols-outlined text-xs text-yellow-500">lightbulb</span>
-                           This suggestion is AI-generated based on the codebase context. Verify before applying.
-                        </div>
-                     </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-2">Metadata</h3>
+                  <div className="space-y-1 text-sm">
+                    {selectedVuln.plugin_id && (
+                      <div className="flex justify-between">
+                        <span className="text-secondary">Plugin ID:</span>
+                        <span className="text-white font-mono">{selectedVuln.plugin_id}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-secondary">Discovered:</span>
+                      <span className="text-white">{new Date(selectedVuln.discovered_at).toLocaleDateString()}</span>
+                    </div>
                   </div>
-
-                  {/* Jira Card */}
-                  {selectedVuln.jiraKey && (
-                     <div className="border border-border rounded bg-surface p-4">
-                        <div className="flex items-center justify-between mb-3">
-                           <div className="flex items-center gap-2">
-                              <div className="w-5 h-5 bg-[#0052CC] rounded flex items-center justify-center text-xs font-bold text-white">J</div>
-                              <span className="text-sm font-semibold text-slate-200">Jira Ticket</span>
-                           </div>
-                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-900/30 text-blue-300 uppercase">In Progress</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                           <div className="flex flex-col">
-                              <span className="text-xs text-secondary">Key</span>
-                              <span className="text-sm font-mono text-slate-200">{selectedVuln.jiraKey}</span>
-                           </div>
-                           <button className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-primary bg-slate-700 hover:bg-slate-600 rounded transition-colors">
-                              Open in Jira
-                              <span className="material-symbols-outlined text-xs">open_in_new</span>
-                           </button>
-                        </div>
-                     </div>
-                  )}
-               </div>
-               <div className="p-4 border-t border-border bg-slate-900/50 flex gap-3">
-                   <button className="flex-1 py-2 text-sm font-medium text-slate-200 bg-surface border border-border rounded shadow-sm hover:bg-slate-700 transition-colors">Ignore</button>
-                   <button className="flex-1 py-2 text-sm font-medium text-white bg-primary rounded shadow-sm hover:bg-blue-600 transition-colors">Fix Now</button>
-               </div>
-             </>
-           )}
-        </aside>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

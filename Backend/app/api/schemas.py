@@ -90,3 +90,58 @@ class AuthResponse(BaseModel):
 class MessageResponse(BaseModel):
     """Generic message response."""
     message: str
+
+
+# Vulnerability schemas
+class AssetResponse(BaseModel):
+    """Asset response data."""
+    id: UUID
+    asset_identifier: str
+    asset_type: str
+    first_seen: datetime
+    last_seen: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class VulnerabilityResponse(BaseModel):
+    """Vulnerability response data."""
+    id: UUID
+    scan_id: UUID
+    asset_id: UUID
+    asset: AssetResponse | None = None
+    plugin_id: str | None = None
+    cve_id: str | None = None
+    title: str
+    description: str | None = None
+    remediation: str | None = None
+    scanner_severity: str
+    cvss_score: float | None = None
+    cvss_vector: str | None = None
+    port: int | None = None
+    protocol: str | None = None
+    status: str
+    discovered_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class VulnerabilityListResponse(BaseModel):
+    """Paginated vulnerability list response."""
+    items: List[VulnerabilityResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class DashboardStatsResponse(BaseModel):
+    """Dashboard statistics response."""
+    total_vulnerabilities: int
+    total_assets: int
+    critical: int
+    high: int
+    medium: int
+    low: int
+    info: int

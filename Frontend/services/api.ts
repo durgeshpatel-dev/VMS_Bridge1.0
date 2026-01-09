@@ -19,10 +19,60 @@ export interface Scan {
   id: string;
   filename: string;
   file_size_mb: number;
-  status: 'uploaded' | 'running' | 'completed' | 'failed';
+  status: 'uploaded' | 'running' | 'completed' | 'failed' | 'processed';
   uploaded_at: string;
   processed_at: string | null;
   metadata?: any;
+  job?: {
+    id: string;
+    status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+    progress: number | null;
+    job_type: string;
+  };
+}
+
+export interface Asset {
+  id: string;
+  asset_identifier: string;
+  asset_type: string;
+  first_seen: string;
+  last_seen: string;
+}
+
+export interface Vulnerability {
+  id: string;
+  scan_id: string;
+  asset_id: string;
+  asset?: Asset;
+  plugin_id: string | null;
+  cve_id: string | null;
+  title: string;
+  description: string | null;
+  remediation: string | null;
+  scanner_severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  cvss_score: number | null;
+  cvss_vector: string | null;
+  port: number | null;
+  protocol: string | null;
+  status: 'open' | 'in_progress' | 'resolved' | 'false_positive';
+  discovered_at: string;
+}
+
+export interface VulnerabilityListResponse {
+  items: Vulnerability[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface DashboardStats {
+  total_vulnerabilities: number;
+  total_assets: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
 }
 
 export interface AuthResponse {
@@ -314,8 +364,12 @@ class ApiClient {
     });
   }
 
-  async listScans(): Promise<Scan[]> {
-    return this.request<Scan[]>('/scans');
+  async listScans(params?: { skip?: number; limit?: number }): Promise<{ items: Scan[]; total: number; skip: number; limit: number }> {
+    const queryParams = new URLSearchParams();
+    if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString());
+    if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString());
+    const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
+    return this.request<{ items: Scan[]; total: number; skip: number; limit: number }>(`/scans${query}`);
   }
 
   async getScan(scanId: string): Promise<Scan> {
@@ -326,6 +380,39 @@ class ApiClient {
     return this.request(`/scans/${scanId}`, {
       method: 'DELETE',
     });
+  }
+
+  // Vulnerability endpoints
+  async listVulnerabilities(params?: {
+    severity?: string;
+    status?: string;
+    asset_id?: string;
+    scan_id?: string;
+    search?: string;
+    skip?: number;
+    limit?: number;
+  }): Promise<VulnerabilityListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.severity) queryParams.append('severity', params.severity);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.asset_id) queryParams.append('asset_id', params.asset_id);
+    if (params?.scan_id) queryParams.append('scan_id', params.scan_id);
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString());
+    if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString());
+    
+    const query = queryParams.toString();
+    return this.request<VulnerabilityListResponse>(
+      `/vulnerabilities${query ? `?${query}` : ''}`
+    );
+  }
+
+  async getVulnerability(vulnerabilityId: string): Promise<Vulnerability> {
+    return this.request<Vulnerability>(`/vulnerabilities/${vulnerabilityId}`);
+  }
+
+  async getDashboardStats(): Promise<DashboardStats> {
+    return this.request<DashboardStats>('/vulnerabilities/dashboard/stats');
   }
 }
 

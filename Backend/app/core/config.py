@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     debug: bool = True
 
     database_url: str | None = None
+    redis_url: str = "redis://localhost:6379/0"
     
     # JWT Authentication Settings
     secret_key: str = "your-secret-key-change-in-production-min-32-chars-long"
