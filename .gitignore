@@ -27,12 +27,13 @@ tmp/
 # PowerShell scripts (ignore all .ps1 files)
 *.ps1
 
-# Ignore specific markdown files considered unnecessary
-/AUTH_INTEGRATION_GUIDE.md
-/QUICK_REF_AUTH.md
-/README_AUTH.md
-/Backend/USERS_SCHEMA.md
+# Shell scripts
+*.sh
 
-# Ignore editor/backup markdown files
+# Markdown files (ignore all except READMEs)
+*.md
+!README.md
+!**/README.md
+
+# Ignore editor/backup files
 *.md~
-# Note: We intentionally do NOT ignore '*.md' generally so README and docs stay tracked
