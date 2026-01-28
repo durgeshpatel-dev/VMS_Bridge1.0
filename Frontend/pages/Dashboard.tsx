@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { apiClient, DashboardStats, Vulnerability, Scan } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
+import { MetricsSkeleton, ListSkeleton, TableSkeleton } from '../components/SkeletonLoader';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -118,9 +119,7 @@ const Dashboard: React.FC = () => {
           
           {/* Metrics */}
           {loading ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="text-secondary">Loading statistics...</div>
-            </div>
+            <MetricsSkeleton />
           ) : stats && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Metric 1 - Total Assets */}
@@ -234,15 +233,7 @@ const Dashboard: React.FC = () => {
                 scrollbarColor: '#1169d4 #1a1d23'
               }}>
                 {loading ? (
-                  <div className="flex items-center justify-center h-full text-secondary text-sm">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="relative w-12 h-12">
-                        <div className="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
-                        <div className="absolute inset-0 border-4 border-transparent border-t-primary rounded-full animate-spin"></div>
-                      </div>
-                      <span>Loading scans...</span>
-                    </div>
-                  </div>
+                  <ListSkeleton items={5} />
                 ) : recentScans.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-secondary text-sm gap-3 p-6">
                     <div className="w-16 h-16 rounded-full bg-surface border border-border flex items-center justify-center">
@@ -387,8 +378,8 @@ const Dashboard: React.FC = () => {
                       <tbody className="divide-y divide-border">
                          {loading ? (
                             <tr>
-                               <td colSpan={5} className="px-6 py-12 text-center text-secondary">
-                                  Loading vulnerabilities...
+                               <td colSpan={5} className="p-0">
+                                  <TableSkeleton rows={5} />
                                </td>
                             </tr>
                          ) : recentVulns.length === 0 ? (

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { apiClient, Vulnerability } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
+import { DetailSkeleton } from '../components/SkeletonLoader';
 
 const Reports: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -72,8 +73,15 @@ const Reports: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full items-center justify-center">
-        <div className="text-secondary">Loading vulnerability report...</div>
+      <div className="flex flex-col h-full overflow-hidden bg-background">
+        <header className="flex-shrink-0 px-8 py-4 border-b border-border bg-background/95 backdrop-blur-sm z-10">
+          <div className="h-8 bg-border rounded w-64 animate-pulse"></div>
+        </header>
+        <div className="flex-1 overflow-y-auto px-8 py-6 custom-scroll">
+          <div className="max-w-5xl mx-auto">
+            <DetailSkeleton />
+          </div>
+        </div>
       </div>
     );
   }

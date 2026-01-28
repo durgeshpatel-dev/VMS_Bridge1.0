@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, Scan } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
+import { TableSkeleton } from '../components/SkeletonLoader';
 
 const ALLOWED_EXTENSIONS = ['.json', '.xml', '.csv', '.txt', '.sarif', '.cyclonedx'];
 const MAX_FILE_SIZE_MB = 100;
@@ -280,8 +281,8 @@ const ScanUpload: React.FC = () => {
             </div>
 
             {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <span className="material-symbols-outlined text-4xl text-primary animate-pulse">sync</span>
+              <div className="overflow-hidden rounded-xl border border-border bg-surface">
+                <TableSkeleton rows={10} />
               </div>
             ) : scans.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-secondary">

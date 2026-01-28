@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient, Vulnerability, VulnerabilityListResponse } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
+import { TableSkeleton } from '../components/SkeletonLoader';
 
 const Vulnerabilities: React.FC = () => {
     
@@ -189,9 +190,7 @@ const Vulnerabilities: React.FC = () => {
 
           <div className="flex-1 overflow-auto px-4 pb-4 custom-scroll">
             {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="text-secondary">Loading vulnerabilities...</div>
-              </div>
+              <TableSkeleton rows={10} />
             ) : vulnerabilities.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-secondary">
                 <span className="material-symbols-outlined text-4xl mb-2">search_off</span>
