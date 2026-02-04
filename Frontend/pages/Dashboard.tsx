@@ -212,7 +212,7 @@ const Dashboard: React.FC = () => {
             <div className="flex flex-col rounded-xl border border-border bg-surface overflow-hidden h-[400px] shadow-lg hover:shadow-xl transition-shadow duration-300">
               <div className="p-5 border-b border-border flex justify-between items-center bg-gradient-to-r from-surface to-[#283039]/30">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                  <span className="material-symbols-outlined text-primary text-lg">scan</span>
                   <h3 className="text-white text-lg font-bold">Recent Scans</h3>
                   {!loading && recentScans.length > 0 && (
                     <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/20 text-primary border border-primary/30">
@@ -256,31 +256,29 @@ const Dashboard: React.FC = () => {
                       <div 
                         key={scan.id}
                         onClick={() => navigate(`/vulnerabilities?scan_id=${scan.id}`)}
-                        className="relative flex gap-4 p-4 hover:bg-gradient-to-r hover:from-[#283039]/50 hover:to-transparent transition-all duration-200 group cursor-pointer"
+                        className="relative flex gap-4 p-4 hover:bg-gradient-to-r hover:from-[#283039]/30 hover:to-transparent transition-all duration-150 group cursor-pointer"
                         style={{ 
                           animation: `slideIn 0.3s ease-out ${index * 0.1}s backwards`
                         }}
                       >
                         {/* Left border accent on hover */}
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary scale-y-0 group-hover:scale-y-100 transition-transform duration-200 origin-top rounded-r"></div>
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary scale-y-0 group-hover:scale-y-100 transition-transform duration-150 origin-top rounded-r"></div>
                         
                         {/* Status Icon */}
                         <div className="relative mt-1 flex-shrink-0">
-                          <div className={`size-10 rounded-xl flex items-center justify-center border-2 transition-all duration-200 group-hover:scale-110 ${
+                          <div className={`size-10 rounded-xl flex items-center justify-center border-2 transition-all duration-150 group-hover:scale-105 ${
                             scan.status === 'completed' 
-                              ? 'bg-gradient-to-br from-green-500/20 to-green-600/10 text-green-400 border-green-500/40 shadow-lg shadow-green-500/20'
+                              ? 'bg-gradient-to-br from-green-500/20 to-green-600/10 text-green-400 border-green-500/40'
                               : scan.status === 'failed'
-                              ? 'bg-gradient-to-br from-red-500/20 to-red-600/10 text-red-400 border-red-500/40 shadow-lg shadow-red-500/20'
+                              ? 'bg-gradient-to-br from-red-500/20 to-red-600/10 text-red-400 border-red-500/40'
                               : scan.status === 'running'
-                              ? 'bg-gradient-to-br from-blue-500/20 to-blue-600/10 text-primary border-blue-500/40 shadow-lg shadow-blue-500/20'
-                              : 'bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 text-yellow-400 border-yellow-500/40 shadow-lg shadow-yellow-500/20'
+                              ? 'bg-gradient-to-br from-blue-500/20 to-blue-600/10 text-primary border-blue-500/40'
+                              : 'bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 text-yellow-400 border-yellow-500/40'
                           }`}>
                             <span className={`material-symbols-outlined text-lg ${
                               scan.status === 'running' ? 'animate-spin' : ''
                             }`}>
-                              {scan.status === 'completed' ? 'check_circle' : 
-                               scan.status === 'failed' ? 'error' : 
-                               scan.status === 'running' ? 'sync' : 'pending'}
+                              scan
                             </span>
                           </div>
                           {/* Pulse effect for running scans */}
@@ -295,7 +293,7 @@ const Dashboard: React.FC = () => {
                             <p className="text-white text-sm font-semibold truncate group-hover:text-primary transition-colors">
                               {scan.filename}
                             </p>
-                            <span className="material-symbols-outlined text-secondary text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="material-symbols-outlined text-secondary text-sm opacity-0 group-hover:opacity-100 transition-all duration-150 group-hover:translate-x-0.5">
                               arrow_forward
                             </span>
                           </div>

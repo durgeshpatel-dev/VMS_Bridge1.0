@@ -145,3 +145,27 @@ class DashboardStatsResponse(BaseModel):
     medium: int
     low: int
     info: int
+
+
+# Ticket schemas
+class CreateTicketRequest(BaseModel):
+    """Create ticket request."""
+    vulnerability_ids: List[UUID] | None = None  # None means create for all vulnerabilities
+    title: str | None = None
+    description: str | None = None
+    priority: str = "Medium"  # High, Medium, Low
+    issue_type: str = "Bug"
+
+
+class TicketResponse(BaseModel):
+    """Ticket creation response."""
+    ticket_id: str
+    ticket_url: str
+    vulnerability_ids: List[UUID]
+    created_at: datetime
+
+
+class TicketListResponse(BaseModel):
+    """Ticket list response."""
+    items: List[TicketResponse]
+    total: int

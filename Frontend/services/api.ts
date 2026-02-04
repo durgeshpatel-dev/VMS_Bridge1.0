@@ -414,6 +414,20 @@ class ApiClient {
   async getDashboardStats(): Promise<DashboardStats> {
     return this.request<DashboardStats>('/vulnerabilities/dashboard/stats');
   }
+
+  // Ticket endpoints
+  async createTicket(data: {
+    vulnerability_ids: string[] | null;
+    title?: string;
+    description?: string;
+    priority?: string;
+    issue_type?: string;
+  }): Promise<any> {
+    return this.request('/tickets/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

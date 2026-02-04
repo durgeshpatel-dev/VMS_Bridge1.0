@@ -141,3 +141,21 @@ export const DetailSkeleton: React.FC = () => (
     <SkeletonLoader variant="detail" />
   </div>
 );
+
+export const AppLoadingSkeleton: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="flex flex-col items-center gap-6">
+      {/* Logo skeleton */}
+      <div className="w-20 h-20 bg-primary/20 rounded-xl animate-pulse"></div>
+      
+      {/* Text skeleton */}
+      <div className="space-y-2 text-center">
+        <div className="h-8 bg-border rounded w-48 mx-auto animate-pulse"></div>
+        <div className="h-4 bg-border rounded w-32 mx-auto animate-pulse"></div>
+      </div>
+      
+      {/* Loading indicator */}
+      <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+    </div>
+  </div>
+);

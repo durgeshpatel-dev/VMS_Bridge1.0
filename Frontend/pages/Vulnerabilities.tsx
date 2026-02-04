@@ -104,6 +104,21 @@ const Vulnerabilities: React.FC = () => {
           )}
         </div>
         <div className="flex items-center gap-3">
+          <button 
+            onClick={async () => {
+              try {
+                await apiClient.createTicket({ vulnerability_ids: null }); // null means all vulnerabilities
+                showToast('Tickets created successfully!', 'success');
+              } catch (error: any) {
+                showToast(error.message || 'Failed to create tickets', 'error');
+              }
+            }}
+            className="flex items-center gap-2 h-8 px-3 bg-primary hover:bg-blue-600 text-white text-sm font-medium rounded transition-colors"
+            title="Create tickets for all vulnerabilities"
+          >
+            <span className="material-symbols-outlined text-sm">confirmation_number</span>
+            <span>Create All Tickets</span>
+          </button>
           <div className="relative">
             <input
               type="text"
@@ -206,6 +221,7 @@ const Vulnerabilities: React.FC = () => {
                     <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">CVE</th>
                     <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">Port</th>
                     <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">Status</th>
+                    <th className="py-3 px-4 text-xs font-semibold text-secondary uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
@@ -247,6 +263,24 @@ const Vulnerabilities: React.FC = () => {
                         <span className={`px-2 py-1 rounded text-xs font-medium capitalize border ${getStatusColor(vuln.status)}`}>
                           {vuln.status.replace('_', ' ')}
                         </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <button 
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await apiClient.createTicket({ vulnerability_ids: [vuln.id] });
+                              showToast(`Ticket created for ${vuln.title}!`, 'success');
+                            } catch (error: any) {
+                              showToast(error.message || 'Failed to create ticket', 'error');
+                            }
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 text-xs font-medium bg-primary/20 hover:bg-primary/30 text-primary hover:text-white rounded border border-primary/30 hover:border-primary/50 transition-colors"
+                          title="Create ticket for this vulnerability"
+                        >
+                          <span className="material-symbols-outlined text-sm">confirmation_number</span>
+                          <span>Ticket</span>
+                        </button>
                       </td>
                     </tr>
                   ))}

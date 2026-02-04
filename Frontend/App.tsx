@@ -10,20 +10,14 @@ import Settings from './pages/Settings';
 import Reports from './pages/Reports';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import { AppLoadingSkeleton } from './components/SkeletonLoader';
 
 // Protected Route wrapper component
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
   
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="size-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-secondary">Loading...</p>
-        </div>
-      </div>
-    );
+    return <AppLoadingSkeleton />;
   }
   
   return isAuthenticated ? children : <Navigate to="/login" replace />;
@@ -34,14 +28,7 @@ const PublicRoute: React.FC<{ children: React.ReactElement }> = ({ children }) =
   const { isAuthenticated, isLoading } = useAuth();
   
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="size-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-secondary">Loading...</p>
-        </div>
-      </div>
-    );
+    return <AppLoadingSkeleton />;
   }
   
   return isAuthenticated ? <Navigate to="/" replace /> : children;
