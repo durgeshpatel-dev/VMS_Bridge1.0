@@ -356,13 +356,24 @@ const ScanUpload: React.FC = () => {
                               </span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-right">
+                           <td className="px-6 py-4 text-right">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/reports?scanId=${scan.id}`);
+                              }}
+                              className="text-secondary hover:text-primary p-2 rounded hover:bg-border transition-colors mr-2"
+                              title="View Report"
+                            >
+                              <span className="material-symbols-outlined text-[20px]">description</span>
+                            </button>
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDelete(scan.id, scan.filename);
                               }}
                               className="text-secondary hover:text-red-400 p-2 rounded hover:bg-border transition-colors"
+                              title="Delete"
                             >
                               <span className="material-symbols-outlined text-[20px]">delete</span>
                             </button>

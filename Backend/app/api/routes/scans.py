@@ -227,6 +227,178 @@ async def get_scan(
     }
 
 
+@router.get("/{scan_id}/report")
+async def get_scan_report(
+    scan_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get detailed scan report with vulnerability statistics and breakdown."""
+    from sqlalchemy import select, func
+    from app.db.models import Vulnerability, Asset
+    
+    try:
+        scan_uuid = uuid.UUID(scan_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid scan ID format",
+        )
+    
+    # Get scan details
+    result = await db.execute(
+        select(Scan).where(Scan.id == scan_uuid, Scan.user_id == current_user.id)
+    )
+    scan = result.scalar_one_or_none()
+    
+    if not scan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Scan not found",
+        )
+    
+    # Get vulnerability statistics by severity
+    severity_counts = {}
+    for severity in ['critical', 'high', 'medium', 'low', 'info']:
+        count = await db.scalar(
+            select(func.count()).select_from(Vulnerability).where(
+                Vulnerability.user_id == current_user.id,
+                Vulnerability.scan_id == scan_uuid,
+                Vulnerability.scanner_severity == severity
+            )
+        )
+        severity_counts[severity] = count or 0
+    
+    # Get total vulnerabilities
+    total_vulnerabilities = await db.scalar(
+        select(func.count()).select_from(Vulnerability).where(
+            Vulnerability.user_id == current_user.id,
+            Vulnerability.scan_id == scan_uuid
+        )
+    )
+    
+    # Get unique assets affected
+    total_assets = await db.scalar(
+        select(func.count(func.distinct(Vulnerability.asset_id))).select_from(Vulnerability).where(
+            Vulnerability.user_id == current_user.id,
+            Vulnerability.scan_id == scan_uuid
+        )
+    )
+    
+    # Get vulnerability breakdown by asset type
+    asset_type_counts = await db.execute(
+        select(
+            Asset.asset_type,
+            func.count(Vulnerability.id)
+        ).join(
+            Vulnerability, Asset.id == Vulnerability.asset_id
+        ).where(
+            Vulnerability.user_id == current_user.id,
+            Vulnerability.scan_id == scan_uuid
+        ).group_by(Asset.asset_type)
+    )
+    
+    asset_type_breakdown = {row[0]: row[1] for row in asset_type_counts.all()}
+    
+    # Get top vulnerabilities by severity
+    top_vulnerabilities_query = select(Vulnerability, Asset).join(
+        Asset, Vulnerability.asset_id == Asset.id
+    ).where(
+        Vulnerability.user_id == current_user.id,
+        Vulnerability.scan_id == scan_uuid
+    ).order_by(
+        # Order by severity using case statement correctly
+        (Vulnerability.scanner_severity == 'critical').desc(),
+        (Vulnerability.scanner_severity == 'high').desc(),
+        (Vulnerability.scanner_severity == 'medium').desc(),
+        (Vulnerability.scanner_severity == 'low').desc(),
+        (Vulnerability.scanner_severity == 'info').desc(),
+        Vulnerability.cvss_score.desc()
+    ).limit(10)
+    
+    top_vulnerabilities = await db.execute(top_vulnerabilities_query)
+    top_vulns = []
+    for vuln, asset in top_vulnerabilities.all():
+        top_vulns.append({
+            "id": str(vuln.id),
+            "title": vuln.title,
+            "severity": vuln.scanner_severity,
+            "cvss_score": float(vuln.cvss_score) if vuln.cvss_score else None,
+            "cve_id": vuln.cve_id,
+            "asset_identifier": asset.asset_identifier
+        })
+    
+    # Get all vulnerabilities for this scan (paginated)
+    vulnerabilities_query = select(Vulnerability, Asset).join(
+        Asset, Vulnerability.asset_id == Asset.id
+    ).where(
+        Vulnerability.user_id == current_user.id,
+        Vulnerability.scan_id == scan_uuid
+    ).order_by(
+        (Vulnerability.scanner_severity == 'critical').desc(),
+        (Vulnerability.scanner_severity == 'high').desc(),
+        (Vulnerability.scanner_severity == 'medium').desc(),
+        (Vulnerability.scanner_severity == 'low').desc(),
+        (Vulnerability.scanner_severity == 'info').desc(),
+        Vulnerability.cvss_score.desc()
+    )
+    
+    vulnerabilities_result = await db.execute(vulnerabilities_query)
+    vulnerabilities = []
+    for vuln, asset in vulnerabilities_result.all():
+        vulnerabilities.append({
+            "id": str(vuln.id),
+            "title": vuln.title,
+            "severity": vuln.scanner_severity,
+            "cvss_score": float(vuln.cvss_score) if vuln.cvss_score else None,
+            "cve_id": vuln.cve_id,
+            "asset_identifier": asset.asset_identifier,
+            "asset_type": asset.asset_type,
+            "status": vuln.status,
+            "discovered_at": vuln.discovered_at.isoformat()
+        })
+    
+    # Calculate risk score (weighted average based on severity)
+    severity_weights = {
+        'critical': 5,
+        'high': 4,
+        'medium': 3,
+        'low': 2,
+        'info': 1
+    }
+    
+    total_weight = 0
+    weighted_sum = 0
+    
+    for severity, count in severity_counts.items():
+        weight = severity_weights.get(severity, 1)
+        weighted_sum += count * weight
+        total_weight += count
+    
+    risk_score = int((weighted_sum / (total_weight * 5)) * 100) if total_weight > 0 else 0
+    
+    return {
+        "scan": {
+            "id": str(scan.id),
+            "filename": scan.filename,
+            "file_size_mb": scan.file_size_mb,
+            "status": scan.status,
+            "uploaded_at": scan.uploaded_at.isoformat(),
+            "processed_at": scan.processed_at.isoformat() if scan.processed_at else None,
+            "metadata": scan.scan_metadata
+        },
+        "statistics": {
+            "total_vulnerabilities": total_vulnerabilities or 0,
+            "total_assets": total_assets or 0,
+            "risk_score": risk_score,
+            "severity_counts": severity_counts,
+            "asset_type_breakdown": asset_type_breakdown
+        },
+        "top_vulnerabilities": top_vulns,
+        "vulnerabilities": vulnerabilities
+    }
+
+
 @router.delete("/{scan_id}")
 async def delete_scan(
     scan_id: str,

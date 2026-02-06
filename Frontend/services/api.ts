@@ -56,6 +56,7 @@ export interface Vulnerability {
   protocol: string | null;
   status: 'open' | 'in_progress' | 'resolved' | 'false_positive';
   discovered_at: string;
+  has_ticket: boolean;
 }
 
 export interface VulnerabilityListResponse {
@@ -376,6 +377,38 @@ class ApiClient {
 
   async getScan(scanId: string): Promise<Scan> {
     return this.request<Scan>(`/scans/${scanId}`);
+  }
+
+  async getScanReport(scanId: string): Promise<{
+    scan: Scan;
+    statistics: {
+      total_vulnerabilities: number;
+      total_assets: number;
+      risk_score: number;
+      severity_counts: { [key: string]: number };
+      asset_type_breakdown: { [key: string]: number };
+    };
+    top_vulnerabilities: Array<{
+      id: string;
+      title: string;
+      severity: string;
+      cvss_score: number | null;
+      cve_id: string | null;
+      asset_identifier: string;
+    }>;
+    vulnerabilities: Array<{
+      id: string;
+      title: string;
+      severity: string;
+      cvss_score: number | null;
+      cve_id: string | null;
+      asset_identifier: string;
+      asset_type: string;
+      status: string;
+      discovered_at: string;
+    }>;
+  }> {
+    return this.request(`/scans/${scanId}/report`);
   }
 
   async deleteScan(scanId: string): Promise<{ message: string }> {

@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 
 from app.api.schemas import VulnerabilityResponse, VulnerabilityListResponse, DashboardStatsResponse
 from app.api.routes.auth import get_current_user
-from app.db.models import User, Vulnerability, Asset
+from app.db.models import User, Vulnerability, Asset, JiraTicket
 from app.db.session import get_db
 
 router = APIRouter(prefix="/vulnerabilities", tags=["vulnerabilities"])
@@ -87,7 +87,7 @@ async def list_vulnerabilities(
     - search: Search in title, description, or CVE ID
     """
     # Build query
-    query = select(Vulnerability).where(Vulnerability.user_id == current_user.id)
+    query = select(Vulnerability, JiraTicket).where(Vulnerability.user_id == current_user.id)
     
     # Apply filters
     if severity:
@@ -139,6 +139,9 @@ async def list_vulnerabilities(
     # Add eager loading for related data
     query = query.options(joinedload(Vulnerability.asset))
     
+    # Left join with JiraTicket to check if ticket exists
+    query = query.outerjoin(JiraTicket, Vulnerability.id == JiraTicket.vulnerability_id)
+    
     # Order by severity (critical first), then by discovered date
     severity_order = {
         'critical': 0,
@@ -154,7 +157,16 @@ async def list_vulnerabilities(
     
     # Execute query
     result = await db.execute(query)
-    vulnerabilities = result.unique().scalars().all()
+    rows = result.unique().all()
+    
+    # Process results to include has_ticket
+    vulnerabilities = []
+    for row in rows:
+        vuln = row[0]  # Vulnerability is first in the tuple
+        ticket = row[1] if len(row) > 1 else None  # JiraTicket if exists
+        vuln_dict = vuln.__dict__.copy()
+        vuln_dict['has_ticket'] = ticket is not None
+        vulnerabilities.append(VulnerabilityResponse(**vuln_dict))
     
     return {
         "items": vulnerabilities,
@@ -171,15 +183,20 @@ async def get_vulnerability(
     current_user: User = Depends(get_current_user),
 ):
     """Get a single vulnerability by ID."""
-    query = select(Vulnerability).where(
+    query = select(Vulnerability, JiraTicket).where(
         Vulnerability.id == vulnerability_id,
         Vulnerability.user_id == current_user.id
-    ).options(joinedload(Vulnerability.asset))
+    ).outerjoin(JiraTicket, Vulnerability.id == JiraTicket.vulnerability_id).options(joinedload(Vulnerability.asset))
     
     result = await db.execute(query)
-    vulnerability = result.unique().scalar_one_or_none()
+    row = result.unique().first()
     
-    if not vulnerability:
+    if not row:
         raise HTTPException(status_code=404, detail="Vulnerability not found")
     
-    return vulnerability
+    vuln = row[0]
+    ticket = row[1]
+    vuln_dict = vuln.__dict__.copy()
+    vuln_dict['has_ticket'] = ticket is not None
+    
+    return VulnerabilityResponse(**vuln_dict)

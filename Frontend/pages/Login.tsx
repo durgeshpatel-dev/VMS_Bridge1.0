@@ -105,6 +105,7 @@ const Login: React.FC = () => {
                     <div className="flex flex-col gap-2">
                         <ReCAPTCHA
                             ref={recaptchaRef}
+                            // todo: Fix error 
                             sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || 'your-site-key'}
                             theme="dark"
                         />

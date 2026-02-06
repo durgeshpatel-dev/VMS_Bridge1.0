@@ -293,9 +293,21 @@ const Dashboard: React.FC = () => {
                             <p className="text-white text-sm font-semibold truncate group-hover:text-primary transition-colors">
                               {scan.filename}
                             </p>
-                            <span className="material-symbols-outlined text-secondary text-sm opacity-0 group-hover:opacity-100 transition-all duration-150 group-hover:translate-x-0.5">
-                              arrow_forward
-                            </span>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/reports?scanId=${scan.id}`);
+                                }}
+                                className="text-secondary hover:text-primary p-1 rounded hover:bg-border transition-colors"
+                                title="View Report"
+                              >
+                                <span className="material-symbols-outlined text-sm">description</span>
+                              </button>
+                              <span className="material-symbols-outlined text-secondary text-sm group-hover:translate-x-0.5">
+                                arrow_forward
+                              </span>
+                            </div>
                           </div>
                           
                           {/* Status Badge */}

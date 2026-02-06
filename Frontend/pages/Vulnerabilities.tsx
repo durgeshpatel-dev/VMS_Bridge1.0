@@ -268,18 +268,28 @@ const Vulnerabilities: React.FC = () => {
                         <button 
                           onClick={async (e) => {
                             e.stopPropagation();
+                            if (vuln.has_ticket) return; // Already has ticket
                             try {
                               await apiClient.createTicket({ vulnerability_ids: [vuln.id] });
                               showToast(`Ticket created for ${vuln.title}!`, 'success');
+                              // Refresh the list to update has_ticket
+                              loadVulnerabilities();
                             } catch (error: any) {
                               showToast(error.message || 'Failed to create ticket', 'error');
                             }
                           }}
-                          className="flex items-center gap-1 px-2 py-1 text-xs font-medium bg-primary/20 hover:bg-primary/30 text-primary hover:text-white rounded border border-primary/30 hover:border-primary/50 transition-colors"
-                          title="Create ticket for this vulnerability"
+                          disabled={vuln.has_ticket}
+                          className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border transition-colors ${
+                            vuln.has_ticket 
+                              ? 'bg-green-500/20 text-green-400 border-green-500/30 cursor-not-allowed' 
+                              : 'bg-primary/20 hover:bg-primary/30 text-primary hover:text-white border-primary/30 hover:border-primary/50'
+                          }`}
+                          title={vuln.has_ticket ? "Ticket already created" : "Create ticket for this vulnerability"}
                         >
-                          <span className="material-symbols-outlined text-sm">confirmation_number</span>
-                          <span>Ticket</span>
+                          <span className="material-symbols-outlined text-sm">
+                            {vuln.has_ticket ? 'check_circle' : 'confirmation_number'}
+                          </span>
+                          <span>{vuln.has_ticket ? 'Ticket Created' : 'Ticket'}</span>
                         </button>
                       </td>
                     </tr>

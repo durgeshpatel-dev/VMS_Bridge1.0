@@ -9,7 +9,7 @@ export interface Toast {
   type: ToastType;
   duration?: number;
 }
-
+// todo:make toast smooth and add trasition effects
 interface ToastContextType {
   showToast: (message: string, type?: ToastType, duration?: number) => void;
   success: (message: string, duration?: number) => void;

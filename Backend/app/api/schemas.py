@@ -125,6 +125,7 @@ class VulnerabilityResponse(BaseModel):
     protocol: str | None = None
     status: str
     discovered_at: datetime
+    has_ticket: bool = False
     
     class Config:
         from_attributes = True
