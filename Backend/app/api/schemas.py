@@ -14,12 +14,14 @@ class UserSignupRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
     full_name: str = Field(..., min_length=1, max_length=255)
+    recaptcha_token: str
 
 
 class UserLoginRequest(BaseModel):
     """User login request."""
     email: EmailStr
     password: str
+    recaptcha_token: str
 
 
 class TokenRefreshRequest(BaseModel):

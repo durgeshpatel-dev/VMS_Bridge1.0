@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 const Signup: React.FC = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ const Signup: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   useEffect(() => {
     const previousBodyOverflow = document.body.style.overflow;
@@ -43,6 +45,13 @@ const Signup: React.FC = () => {
     e.preventDefault();
     setError('');
     
+    const token = recaptchaRef.current?.getValue();
+    if (!token) {
+      setError('Please complete the CAPTCHA');
+      toastError('Please complete the CAPTCHA');
+      return;
+    }
+    
     if (!passwordsMatch) {
       setError('Passwords do not match');
       toastError('Passwords do not match');
@@ -62,13 +71,15 @@ const Signup: React.FC = () => {
     }
     
     try {
-      await signup(email, password, fullName);
+      await signup(email, password, fullName, token);
       success('Account created successfully');
       navigate('/');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Signup failed';
       setError(msg);
       toastError(msg);
+      // Reset CAPTCHA on error
+      recaptchaRef.current?.reset();
     }
   };
 
@@ -230,6 +241,14 @@ const Signup: React.FC = () => {
                 {' '}and{' '}
                 <a href="#" className="text-primary hover:underline">Privacy Policy</a>.
               </label>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <ReCAPTCHA
+                ref={recaptchaRef}
+                sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || 'your-site-key'}
+                theme="dark"
+              />
             </div>
 
             <button 

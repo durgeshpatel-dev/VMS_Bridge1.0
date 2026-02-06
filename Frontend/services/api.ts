@@ -86,12 +86,14 @@ export interface AuthResponse {
 export interface LoginRequest {
   email: string;
   password: string;
+  recaptcha_token: string;
 }
 
 export interface SignupRequest {
   email: string;
   password: string;
   full_name: string;
+  recaptcha_token: string;
 }
 
 class ApiClient {

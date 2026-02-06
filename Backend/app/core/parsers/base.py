@@ -106,4 +106,12 @@ class ScanParser(ABC):
             else:
                 return 'info'
         
+        # Map SARIF/error levels
+        if severity_lower == 'error':
+            return 'critical'
+        elif severity_lower == 'warning':
+            return 'high'
+        elif severity_lower == 'note':
+            return 'medium'
+        
         return severity_map.get(severity_lower, 'info')

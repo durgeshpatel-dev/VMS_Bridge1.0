@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   const { success, error: toastError } = useToast();
 
@@ -16,14 +18,23 @@ const Login: React.FC = () => {
     e.preventDefault();
     setError('');
     
+    const token = recaptchaRef.current?.getValue();
+    if (!token) {
+      setError('Please complete the CAPTCHA');
+      toastError('Please complete the CAPTCHA');
+      return;
+    }
+    
     try {
-      await login(email, password);
+      await login(email, password, token);
       success('Signed in successfully');
       navigate('/');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Login failed';
       setError(msg);
       toastError(msg);
+      // Reset CAPTCHA on error
+      recaptchaRef.current?.reset();
     }
   };
 
@@ -89,6 +100,14 @@ const Login: React.FC = () => {
                         <div className="flex justify-end">
                             <a href="#" className="text-xs text-primary hover:text-blue-400 font-medium">Forgot password?</a>
                         </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        <ReCAPTCHA
+                            ref={recaptchaRef}
+                            sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || 'your-site-key'}
+                            theme="dark"
+                        />
                     </div>
 
                     <button 

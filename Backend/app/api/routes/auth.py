@@ -40,6 +40,23 @@ security = HTTPBearer()
 settings = get_settings()
 
 
+def verify_recaptcha(token: str) -> bool:
+    """
+    Verify reCAPTCHA token with Google's API.
+    """
+    import requests
+    
+    response = requests.post(
+        'https://www.google.com/recaptcha/api/siteverify',
+        data={
+            'secret': settings.recaptcha_secret_key,
+            'response': token,
+        }
+    )
+    result = response.json()
+    return result.get('success', False)
+
+
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     session: Annotated[AsyncSession, Depends(get_db)]
@@ -101,6 +118,13 @@ async def signup(
     """
     Register a new user account.
     """
+    # Verify reCAPTCHA
+    if not verify_recaptcha(user_data.recaptcha_token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CAPTCHA verification failed"
+        )
+    
     # Check if user already exists
     existing_user = await UserService.get_user_by_email(session, user_data.email)
     if existing_user:
@@ -152,6 +176,13 @@ async def login(
     """
     Authenticate user and return JWT tokens.
     """
+    # Verify reCAPTCHA
+    if not verify_recaptcha(credentials.recaptcha_token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CAPTCHA verification failed"
+        )
+    
     # Authenticate user
     user = await UserService.authenticate_user(
         session=session,

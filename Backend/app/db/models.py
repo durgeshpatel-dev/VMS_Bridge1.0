@@ -170,7 +170,7 @@ class Asset(Base):
     __table_args__ = (
         Index("uq_user_asset", "user_id", "asset_identifier", unique=True),
         CheckConstraint(
-            "asset_type IN ('server', 'api', 'load_balancer', 'application', 'network_device', 'other')",
+            "asset_type IN ('server', 'api', 'load_balancer', 'application', 'network_device', 'dependency', 'container', 'code', 'other')",
             name="ck_asset_type"
         ),
     )

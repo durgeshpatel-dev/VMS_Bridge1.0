@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
     
+    # reCAPTCHA Settings
+    recaptcha_secret_key: str = "your-recaptcha-secret-key"
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

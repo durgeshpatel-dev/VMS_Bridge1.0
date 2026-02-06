@@ -37,3 +37,6 @@ tmp/
 
 # Ignore editor/backup files
 *.md~
+
+# Test folders
+Backend/tests/
