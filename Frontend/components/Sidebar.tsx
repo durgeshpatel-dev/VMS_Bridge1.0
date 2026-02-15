@@ -24,7 +24,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
     { name: 'Vulnerabilities', icon: 'bug_report', path: '/vulnerabilities' },
     { name: 'Reports', icon: 'description', path: '/reports' },
     { name: 'Settings', icon: 'settings', path: '/settings' },
-  ];
+    { name: 'Help', icon: 'support_agent', path: '/help' },
+    user?.is_admin ? { name: 'Admin Panel', icon: 'shield_admin', path: '/admin' } : null,
+  ].filter(Boolean) as any[];
 
   return (
     <div className="flex w-64 flex-col bg-[#111418] border-r border-border flex-shrink-0 z-20 h-full lg:h-screen">

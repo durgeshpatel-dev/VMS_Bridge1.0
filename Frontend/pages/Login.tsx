@@ -6,7 +6,7 @@ import ReCAPTCHA from 'react-google-recaptcha';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,9 +26,15 @@ const Login: React.FC = () => {
     }
     
     try {
-      await login(email, password, token);
+      const loggedInUser = await login(email, password, token);
       success('Signed in successfully');
-      navigate('/');
+      
+      // Check if user is admin and redirect accordingly
+      if (loggedInUser.is_admin) {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Login failed';
       setError(msg);

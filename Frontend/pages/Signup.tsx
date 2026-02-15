@@ -71,9 +71,15 @@ const Signup: React.FC = () => {
     }
     
     try {
-      await signup(email, password, fullName, token);
+      const newUser = await signup(email, password, fullName, token);
       success('Account created successfully');
-      navigate('/');
+      
+      // Check if user is admin and redirect accordingly
+      if (newUser.is_admin) {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Signup failed';
       setError(msg);

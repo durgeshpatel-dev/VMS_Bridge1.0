@@ -44,6 +44,7 @@ class User(Base):
     jira_base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("NOW()"), nullable=False
@@ -58,6 +59,116 @@ class User(Base):
     vulnerabilities: Mapped[list["Vulnerability"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     jira_tickets: Mapped[list["JiraTicket"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     jobs: Mapped[list["Job"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    support_tickets: Mapped[list["SupportTicket"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class SupportTicket(Base):
+    """
+    Support tickets table for user complaints and problems.
+    """
+    __tablename__ = "support_tickets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+        nullable=False
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="open",
+        server_default=text("'open'")
+    )
+    priority: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="medium",
+        server_default=text("'medium'")
+    )
+    category: Mapped[str] = mapped_column(String(50), nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        onupdate=text("NOW()"),
+        nullable=False
+    )
+    resolved_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="support_tickets")
+    comments: Mapped[list["TicketComment"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('open', 'in_progress', 'resolved', 'closed')",
+            name="ck_ticket_status"
+        ),
+        CheckConstraint(
+            "priority IN ('low', 'medium', 'high', 'urgent')",
+            name="ck_ticket_priority"
+        ),
+    )
+
+
+class TicketComment(Base):
+    """
+    Comments for support tickets.
+    """
+    __tablename__ = "ticket_comments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+        nullable=False
+    )
+
+    ticket_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("support_tickets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    comment: Mapped[str] = mapped_column(Text, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        nullable=False
+    )
+
+    # Relationships
+    ticket: Mapped["SupportTicket"] = relationship("SupportTicket", back_populates="comments")
+    user: Mapped["User"] = relationship("User")
 
 
 class Scan(Base):
@@ -415,4 +526,3 @@ class Job(Base):
     )
 
 
-# Removed old index definitions - now using __table_args__ in model classes

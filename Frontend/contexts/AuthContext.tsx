@@ -8,8 +8,8 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string, recaptchaToken: string) => Promise<void>;
-  signup: (email: string, password: string, fullName: string, recaptchaToken: string) => Promise<void>;
+  login: (email: string, password: string, recaptchaToken: string) => Promise<User>;
+  signup: (email: string, password: string, fullName: string, recaptchaToken: string) => Promise<User>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -49,17 +49,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initAuth();
   }, []);
 
-  const login = async (email: string, password: string, recaptchaToken: string) => {
+  const login = async (email: string, password: string, recaptchaToken: string): Promise<User> => {
     setIsLoading(true);
     try {
       const response = await apiClient.login({ email, password, recaptcha_token: recaptchaToken });
       setUser(response.user);
+      return response.user;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const signup = async (email: string, password: string, fullName: string, recaptchaToken: string) => {
+  const signup = async (email: string, password: string, fullName: string, recaptchaToken: string): Promise<User> => {
     setIsLoading(true);
     try {
       const response = await apiClient.signup({
@@ -69,6 +70,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         recaptcha_token: recaptchaToken,
       });
       setUser(response.user);
+      return response.user;
     } finally {
       setIsLoading(false);
     }

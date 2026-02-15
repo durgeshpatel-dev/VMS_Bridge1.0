@@ -63,6 +63,7 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     is_active: bool
+    is_admin: bool
     jira_project_keys: List[str] | None = None
     jira_base_url: str | None = None
     created_at: datetime
@@ -172,3 +173,556 @@ class TicketListResponse(BaseModel):
     """Ticket list response."""
     items: List[TicketResponse]
     total: int
+
+
+# Support Ticket schemas
+class CreateSupportTicketRequest(BaseModel):
+    """Create support ticket request."""
+    title: str = Field(..., min_length=1, max_length=255)
+    description: str = Field(..., min_length=1)
+    priority: str = "medium"  # low, medium, high, urgent
+    category: str | None = None
+
+
+class SupportTicketResponse(BaseModel):
+    """Support ticket response."""
+    id: UUID
+    user_id: UUID
+    title: str
+    description: str
+    status: str
+    priority: str
+    category: str | None
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: datetime | None
+    
+    class Config:
+        from_attributes = True
+
+
+class SupportTicketListResponse(BaseModel):
+    """Paginated support ticket list response."""
+    items: List[SupportTicketResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class CreateTicketCommentRequest(BaseModel):
+    """Create ticket comment request."""
+    comment: str = Field(..., min_length=1)
+
+
+class TicketCommentResponse(BaseModel):
+    """Ticket comment response."""
+    id: UUID
+    ticket_id: UUID
+    user_id: UUID
+    comment: str
+    is_admin: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class UpdateTicketStatusRequest(BaseModel):
+    """Update ticket status request."""
+    status: str = Field(..., pattern="^(open|in_progress|resolved|closed)$")
+
+
+class UpdateTicketPriorityRequest(BaseModel):
+    """Update ticket priority request."""
+    priority: str = Field(..., pattern="^(low|medium|high|urgent)$")
+
+
+# Admin schemas
+class UserListResponse(BaseModel):
+    """Paginated user list response."""
+    items: List[UserResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class UpdateUserRoleRequest(BaseModel):
+    """Update user role request."""
+    is_admin: bool
+
+
+class UserStatsResponse(BaseModel):
+    """User statistics response."""
+    total_users: int
+    active_users: int
+    admin_users: int
+    total_tickets: int
+    open_tickets: int
+    in_progress_tickets: int
+    resolved_tickets: int
+    closed_tickets: int
+
+
+class AdminActivityItem(BaseModel):
+    """Admin recent activity item."""
+    id: str
+    type: str
+    title: str
+    detail: str
+    timestamp: datetime
+
+
+class AdminActivityResponse(BaseModel):
+    """Recent activity response."""
+    items: List[AdminActivityItem]
+
+
+class AdminSystemInfoResponse(BaseModel):
+    """System info response."""
+    app_name: str
+    version: str
+    environment: str
+    server_time: datetime
+    uptime_seconds: int
+    database_connected: bool
+    database_latency_ms: float | None = None
+
+
+# Support Ticket schemas
+class CreateSupportTicketRequest(BaseModel):
+    """Create support ticket request."""
+    title: str = Field(..., min_length=1, max_length=255)
+    description: str = Field(..., min_length=1)
+    priority: str = "medium"  # low, medium, high, urgent
+    category: str | None = None
+
+
+class SupportTicketResponse(BaseModel):
+    """Support ticket response."""
+    id: UUID
+    user_id: UUID
+    title: str
+    description: str
+    status: str
+    priority: str
+    category: str | None
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: datetime | None
+    
+    class Config:
+        from_attributes = True
+
+
+class SupportTicketListResponse(BaseModel):
+    """Paginated support ticket list response."""
+    items: List[SupportTicketResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class CreateTicketCommentRequest(BaseModel):
+    """Create ticket comment request."""
+    comment: str = Field(..., min_length=1)
+
+
+class TicketCommentResponse(BaseModel):
+    """Ticket comment response."""
+    id: UUID
+    ticket_id: UUID
+    user_id: UUID
+    comment: str
+    is_admin: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class UpdateTicketStatusRequest(BaseModel):
+    """Update ticket status request."""
+    status: str = Field(..., pattern="^(open|in_progress|resolved|closed)$")
+
+
+class UpdateTicketPriorityRequest(BaseModel):
+    """Update ticket priority request."""
+    priority: str = Field(..., pattern="^(low|medium|high|urgent)$")
+
+
+# Admin schemas
+class UserListResponse(BaseModel):
+    """Paginated user list response."""
+    items: List[UserResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class UpdateUserRoleRequest(BaseModel):
+    """Update user role request."""
+    is_admin: bool
+
+
+class UserStatsResponse(BaseModel):
+    """User statistics response."""
+    total_users: int
+    active_users: int
+    admin_users: int
+    total_tickets: int
+    open_tickets: int
+    in_progress_tickets: int
+    resolved_tickets: int
+    closed_tickets: int
+
+# Support Ticket schemas
+class CreateSupportTicketRequest(BaseModel):
+    """Create support ticket request."""
+    title: str = Field(..., min_length=1, max_length=255)
+    description: str = Field(..., min_length=1)
+    priority: str = "medium"  # low, medium, high, urgent
+    category: str | None = None
+
+
+class SupportTicketResponse(BaseModel):
+    """Support ticket response."""
+    id: UUID
+    user_id: UUID
+    title: str
+    description: str
+    status: str
+    priority: str
+    category: str | None
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: datetime | None
+    
+    class Config:
+        from_attributes = True
+
+
+class SupportTicketListResponse(BaseModel):
+    """Paginated support ticket list response."""
+    items: List[SupportTicketResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class CreateTicketCommentRequest(BaseModel):
+    """Create ticket comment request."""
+    comment: str = Field(..., min_length=1)
+
+
+class TicketCommentResponse(BaseModel):
+    """Ticket comment response."""
+    id: UUID
+    ticket_id: UUID
+    user_id: UUID
+    comment: str
+    is_admin: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class UpdateTicketStatusRequest(BaseModel):
+    """Update ticket status request."""
+    status: str = Field(..., pattern="^(open|in_progress|resolved|closed)$")
+
+
+class UpdateTicketPriorityRequest(BaseModel):
+    """Update ticket priority request."""
+    priority: str = Field(..., pattern="^(low|medium|high|urgent)$")
+
+
+# Admin schemas
+class UserListResponse(BaseModel):
+    """Paginated user list response."""
+    items: List[UserResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class UpdateUserRoleRequest(BaseModel):
+    """Update user role request."""
+    is_admin: bool
+
+
+class UserStatsResponse(BaseModel):
+    """User statistics response."""
+    total_users: int
+    active_users: int
+    admin_users: int
+    total_tickets: int
+    open_tickets: int
+    in_progress_tickets: int
+    resolved_tickets: int
+    closed_tickets: int
+
+
+# Support Ticket schemas
+class CreateSupportTicketRequest(BaseModel):
+    """Create support ticket request."""
+    title: str = Field(..., min_length=1, max_length=255)
+    description: str = Field(..., min_length=1)
+    priority: str = "medium"  # low, medium, high, urgent
+    category: str | None = None
+
+
+class SupportTicketResponse(BaseModel):
+    """Support ticket response."""
+    id: UUID
+    user_id: UUID
+    title: str
+    description: str
+    status: str
+    priority: str
+    category: str | None
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: datetime | None
+    
+    class Config:
+        from_attributes = True
+
+
+class SupportTicketListResponse(BaseModel):
+    """Paginated support ticket list response."""
+    items: List[SupportTicketResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class CreateTicketCommentRequest(BaseModel):
+    """Create ticket comment request."""
+    comment: str = Field(..., min_length=1)
+
+
+class TicketCommentResponse(BaseModel):
+    """Ticket comment response."""
+    id: UUID
+    ticket_id: UUID
+    user_id: UUID
+    comment: str
+    is_admin: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class UpdateTicketStatusRequest(BaseModel):
+    """Update ticket status request."""
+    status: str = Field(..., pattern="^(open|in_progress|resolved|closed)$")
+
+
+class UpdateTicketPriorityRequest(BaseModel):
+    """Update ticket priority request."""
+    priority: str = Field(..., pattern="^(low|medium|high|urgent)$")
+
+
+# Admin schemas
+class UserListResponse(BaseModel):
+    """Paginated user list response."""
+    items: List[UserResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class UpdateUserRoleRequest(BaseModel):
+    """Update user role request."""
+    is_admin: bool
+
+
+class UserStatsResponse(BaseModel):
+    """User statistics response."""
+    total_users: int
+    active_users: int
+    admin_users: int
+    total_tickets: int
+    open_tickets: int
+    in_progress_tickets: int
+    resolved_tickets: int
+    closed_tickets: int
+
+
+# Support Ticket schemas
+class CreateSupportTicketRequest(BaseModel):
+    """Create support ticket request."""
+    title: str = Field(..., min_length=1, max_length=255)
+    description: str = Field(..., min_length=1)
+    priority: str = "medium"  # low, medium, high, urgent
+    category: str | None = None
+
+
+class SupportTicketResponse(BaseModel):
+    """Support ticket response."""
+    id: UUID
+    user_id: UUID
+    title: str
+    description: str
+    status: str
+    priority: str
+    category: str | None
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: datetime | None
+    
+    class Config:
+        from_attributes = True
+
+
+class SupportTicketListResponse(BaseModel):
+    """Paginated support ticket list response."""
+    items: List[SupportTicketResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class CreateTicketCommentRequest(BaseModel):
+    """Create ticket comment request."""
+    comment: str = Field(..., min_length=1)
+
+
+class TicketCommentResponse(BaseModel):
+    """Ticket comment response."""
+    id: UUID
+    ticket_id: UUID
+    user_id: UUID
+    comment: str
+    is_admin: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class UpdateTicketStatusRequest(BaseModel):
+    """Update ticket status request."""
+    status: str = Field(..., pattern="^(open|in_progress|resolved|closed)$")
+
+
+class UpdateTicketPriorityRequest(BaseModel):
+    """Update ticket priority request."""
+    priority: str = Field(..., pattern="^(low|medium|high|urgent)$")
+
+
+# Admin schemas
+class UserListResponse(BaseModel):
+    """Paginated user list response."""
+    items: List[UserResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class UpdateUserRoleRequest(BaseModel):
+    """Update user role request."""
+    is_admin: bool
+
+
+class UserStatsResponse(BaseModel):
+    """User statistics response."""
+    total_users: int
+    active_users: int
+    admin_users: int
+    total_tickets: int
+    open_tickets: int
+    in_progress_tickets: int
+    resolved_tickets: int
+    closed_tickets: int
+
+# Support Ticket schemas
+class CreateSupportTicketRequest(BaseModel):
+    """Create support ticket request."""
+    title: str = Field(..., min_length=1, max_length=255)
+    description: str = Field(..., min_length=1)
+    priority: str = "medium"  # low, medium, high, urgent
+    category: str | None = None
+
+
+class SupportTicketResponse(BaseModel):
+    """Support ticket response."""
+    id: UUID
+    user_id: UUID
+    title: str
+    description: str
+    status: str
+    priority: str
+    category: str | None
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: datetime | None
+    
+    class Config:
+        from_attributes = True
+
+
+class SupportTicketListResponse(BaseModel):
+    """Paginated support ticket list response."""
+    items: List[SupportTicketResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class CreateTicketCommentRequest(BaseModel):
+    """Create ticket comment request."""
+    comment: str = Field(..., min_length=1)
+
+
+class TicketCommentResponse(BaseModel):
+    """Ticket comment response."""
+    id: UUID
+    ticket_id: UUID
+    user_id: UUID
+    comment: str
+    is_admin: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class UpdateTicketStatusRequest(BaseModel):
+    """Update ticket status request."""
+    status: str = Field(..., pattern="^(open|in_progress|resolved|closed)$")
+
+
+class UpdateTicketPriorityRequest(BaseModel):
+    """Update ticket priority request."""
+    priority: str = Field(..., pattern="^(low|medium|high|urgent)$")
+
+
+# Admin schemas
+class UserListResponse(BaseModel):
+    """Paginated user list response."""
+    items: List[UserResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class UpdateUserRoleRequest(BaseModel):
+    """Update user role request."""
+    is_admin: bool
+
+
+class UserStatsResponse(BaseModel):
+    """User statistics response."""
+    total_users: int
+    active_users: int
+    admin_users: int
+    total_tickets: int
+    open_tickets: int
+    in_progress_tickets: int
+    resolved_tickets: int
+    closed_tickets: int
+
+
